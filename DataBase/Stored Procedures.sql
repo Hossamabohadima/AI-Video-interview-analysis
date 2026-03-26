@@ -23,8 +23,6 @@ BEGIN
     -- 3. Initialize MetricWeight with default 1.0 (or 0.0)
     INSERT INTO MetricWeight (userID, SpeechClarity, SpeechFluency, SpeechConfidence)
     VALUES (new_userid, 0, 1.0, 0); 
-
-    COMMIT;
 END;
 $$;
 
@@ -34,15 +32,19 @@ CREATE OR REPLACE FUNCTION add_video(
     p_user_id INT,
     p_duration DECIMAL(5,2),
     p_status videoStatus
-) RETURNS INT AS $$
+) 
+RETURNS JSON AS $$
 DECLARE
-    new_video_id INT;
+    v_id INT;
+    v_status videoStatus;
 BEGIN
-    -- 1. Insert Video record
     INSERT INTO Video (VideoName, userID, duration, status)
     VALUES (p_video_name, p_user_id, p_duration, p_status)
-    RETURNING videoID INTO new_video_id;
+    RETURNING videoID, status INTO v_id, v_status;
 
-    RETURN new_video_id;
+    RETURN json_build_object(
+        'video_id', v_id,
+        'status', v_status
+    );
 END;
 $$ LANGUAGE plpgsql;
