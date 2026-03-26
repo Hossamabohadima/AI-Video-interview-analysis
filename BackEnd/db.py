@@ -1,10 +1,10 @@
 import psycopg2
 
 DB_CONFIG = {
-    "dbname": "your_db_name",
+    "dbname": "interview_ai",
     "user": "postgres",
-    "password": "your_password",
-    "host": "localhost",
+    "password": "122333",
+    "host": "127.0.0.1",
     "port": "5432"
 }
 

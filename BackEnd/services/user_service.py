@@ -40,13 +40,12 @@ def upload_video(video):
         (video.video_name, video.user_id, video.duration, video.status)
     )
 
-    video_id = cur.fetchone()[0]
+    result = cur.fetchone()
     conn.commit()
 
     cur.close()
     conn.close()
-
-    return video_id
+    return result[0]
 
 
 def get_reports(user_id):

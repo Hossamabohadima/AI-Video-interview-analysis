@@ -6,5 +6,5 @@ router = APIRouter()
 
 @router.post("/upload")
 def upload(video: VideoUpload):
-    video_id = upload_video(video)
-    return {"video_id": video_id}
+    result = upload_video(video)
+    return result
