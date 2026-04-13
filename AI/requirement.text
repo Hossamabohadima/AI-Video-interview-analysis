@@ -1,0 +1,5 @@
+transformers
+torch
+torchvision
+eyed3
+pyAudioAnalysis
