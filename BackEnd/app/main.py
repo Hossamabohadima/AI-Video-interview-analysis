@@ -1,15 +1,23 @@
 from fastapi import FastAPI
+from api.user import router as user_router 
 
-from api.auth_api import router as auth_router
-from api.video_api import router as video_router
-from api.report_api import router as report_router
-from api.weight_api import router as weight_router
-from api.threshold_api import router as threshold_router
+# 1. Change the Title and the URL path
+app = FastAPI(
+    title="interviewMe",
+    docs_url="/interviewMe",  # This changes http://127.0.0.1:8000/docs to /interviewMe
+    redoc_url=None           # Optional: disables the alternative /redoc path
+)
 
-app = FastAPI()
+app.include_router(user_router)
 
-app.include_router(auth_router, prefix="/auth")
-app.include_router(video_router, prefix="/video")
-app.include_router(report_router, prefix="/reports")
-app.include_router(weight_router, prefix="/weights")
-app.include_router(threshold_router, prefix="/threshold")
+# 2. Print the custom URL to the terminal
+@app.on_event("startup")
+async def startup_event():
+    print("\n" + "★"*40)
+    print("  interviewMe BACKEND IS ACTIVE")
+    print("  Access Swagger UI: http://127.0.0.1:8000/interviewMe")
+    print("★"*40 + "\n")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
