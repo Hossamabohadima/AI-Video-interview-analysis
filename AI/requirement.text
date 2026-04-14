@@ -5,3 +5,5 @@ whisper
 deepface
 eyed3
 pyAudioAnalysis
+ffmpeg
+nltk
