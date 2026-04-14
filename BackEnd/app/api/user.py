@@ -1,13 +1,40 @@
-from altair import Dict
-from fastapi import APIRouter
-from BackEnd.app.schemas import Threshold
-from services.user_service import get_reports, compare_reports, set_weights
-from services.user_service import set_threshold_score
-from fastapi import APIRouter, UploadFile, File, Form
-from services.user_service import upload_video
+from fastapi import APIRouter, HTTPException
 
+from ..schemas.user import LoginRequest, RegistrationRequest, RegistrationResponse
+from ..services.user_service import login_user, register_user
 
 router = APIRouter()
+
+
+@router.post("/auth/signup", response_model=RegistrationResponse, status_code=201)
+def signup(payload: RegistrationRequest):
+    """
+    User signup endpoint. Registers a new user in the system.
+    Validates credentials, creates user record, initializes threshold and metric weights.
+    Returns the created user information.
+    """
+    try:
+        user = register_user(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if user is None:
+        raise HTTPException(status_code=400, detail="Signup failed")
+
+    return {"message": "User registered successfully", "user": user}
+
+
+@router.post("/auth/login")
+def login(payload: LoginRequest):
+    """
+    User login endpoint. Authenticates user credentials.
+    Returns user information if credentials are valid.
+    """
+    user = login_user(payload.email, payload.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"message": "Login successful", "user": user}
+
 
 @router.get("/reports/{user_id}")
 def reports(user_id: int):

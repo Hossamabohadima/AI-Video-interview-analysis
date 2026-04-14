@@ -7,6 +7,67 @@ from moviepy import VideoFileClip
 import uuid, os, shutil
 
 
+def _map_user_row(row):
+    """Helper to map database row to user dict"""
+    if row is None:
+        return None
+    return {
+        "user_id": row[0],
+        "name": row[1],
+        "role": row[2],
+    }
+
+
+def register_user(payload):
+    """
+    Register a new user in the system.
+    Calls stored procedure register_user to create user record with initial threshold and metric weights.
+    """
+    from schemas.user import RegistrationRequest
+    from db import get_db_connection
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            "CALL register_user(%s, %s, %s, %s, %s, %s)",
+            (
+                payload.name,
+                payload.email,
+                payload.password,
+                payload.phone_number,
+                payload.role,
+                payload.initial_threshold,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+    return login_user(payload.email, payload.password)
+
+
+def login_user(email: str, password: str):
+    """
+    Authenticate user by email and password.
+    Returns user information if credentials match, None otherwise.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT * FROM login_user_sp(%s, %s)", (email, password))
+        row = cur.fetchone()
+        return _map_user_row(row)
+    finally:
+        cur.close()
+        conn.close()
+
 
 def upload_video(file: UploadFile, user_id: int, video_name: str):
     folder = "videos"

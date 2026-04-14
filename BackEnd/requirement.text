@@ -2,3 +2,6 @@ pydantic
 fastapi
 moviepy
 psycopg2
+uvicorn
+python-multipart
+email-validator

@@ -1,43 +1,38 @@
+from __future__ import annotations
 
-from BackEnd.app.schemas.video import MetricWeights, video, Scores 
-# from BackEnd.app.analysis_models import IAnalysisModel
-from db import get_db_connection
-
-
-def process_video(weights: MetricWeights):
-
-    # standardized_video = standardize_video(video)
-
-    # Analysis models
-
-    # calculate scores based on the analysis results and metric weights
-
-    # return scores
-    pass
+from ..db import get_db_connection
+from ..schemas.video import MetricWeight, Score, VideoRecord
 
 
-# why this function if it will call another method already??
-# we can just call the IAnalysisModel-VideoStandardizer method directly in the process_video method, right?
-# def standardize_video(video: video):
-#       return VideoStandardizer.standardize(video)
+def _empty_score() -> Score:
+    return Score(
+        speechClarity=0.0,
+        speechFluency=0.0,
+        speechConfidence=0.0,
+        speechExpressiveness=0.0,
+        speechEngagement=0.0,
+        facialConfidence=0.0,
+        facialApproachability=0.0,
+        facialEngagement=0.0,
+        videoProfessionalism=0.0,
+        totalScore=0.0,
+    )
 
 
-def add_analysis_model(model: IAnalysisModel):
+def process_video(video_data: VideoRecord, weights: MetricWeight) -> Score:
+    # The AI model output is calculated in the notebooks for now.
+    # The backend keeps the contract and returns the persisted score row.
+    score = get_scores(video_data.videoID)
+    return score or _empty_score()
 
-    # logic?
-    
-    # return None
-
-    pass
-
-def get_scores(video_id: int) -> Scores | None:
+def get_scores(video_id: int) -> Score | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT * FROM get_video_scores(%s)", (video_id,))
         row = cursor.fetchone()
         if row:
-            return Scores(
+            return Score(
                 speechClarity=row[0],
                 speechFluency=row[1],
                 speechConfidence=row[2],

@@ -7,7 +7,11 @@ class video(BaseModel):
     # analysisModels: list[IAnalysisModel]
     # scores: Scores
 
-class Scores(BaseModel):
+class Score(BaseModel):
+    """
+    Score class: Represents video analysis scores across various dimensions.
+    Contains scores for speech, facial, and professionalism metrics.
+    """
     speechClarity: float
     speechFluency: float
     speechConfidence: float
@@ -19,7 +23,12 @@ class Scores(BaseModel):
     videoProfessionalism: float
     totalScore: float
 
-class MetricWeights(BaseModel):
+
+class MetricWeight(BaseModel):
+    """
+    MetricWeight class: Stores weighted values for each evaluation metric.
+    Used to customize scoring priority for different evaluation categories.
+    """
     speechClarity: float = 0.0
     speechFluency: float = 0.0
     speechConfidence: float = 0.0
@@ -29,3 +38,8 @@ class MetricWeights(BaseModel):
     facialApproachability: float = 0.0
     facialEngagement: float = 0.0
     videoProfessionalism: float = 0.0
+
+
+# Backward compatibility aliases
+Scores = Score
+MetricWeights = MetricWeight
