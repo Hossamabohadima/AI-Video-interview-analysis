@@ -1,2 +1,9 @@
+transformers
+torch
+torchvision
 whisper
 deepface
+eyed3
+pyAudioAnalysis
+ffmpeg
+nltk

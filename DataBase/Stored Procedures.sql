@@ -141,9 +141,6 @@ $$;
 
 
 
-
-
-
 CREATE OR REPLACE FUNCTION login_user_sp(p_email TEXT, p_password TEXT)
 RETURNS TABLE(userid INT, name TEXT, role user_role) AS $$
 BEGIN
@@ -155,4 +152,25 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-
+CREATE OR REPLACE FUNCTION get_video_scores(p_video_id INT)
+RETURNS TABLE(
+    speechClarity DECIMAL(5,2),
+    speechFluency DECIMAL(5,2),
+    speechConfidence DECIMAL(5,2),
+    speechExpressiveness DECIMAL(5,2),
+    speechEngagement DECIMAL(5,2),
+    facialConfidence DECIMAL(5,2),
+    facialApproachability DECIMAL(5,2),
+    facialEngagement DECIMAL(5,2),
+    videoProfessionalism DECIMAL(5,2),
+    totalScore DECIMAL(5,2)
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        SpeechClarity, SpeechFluency, SpeechConfidence, SpeechExpressiveness, SpeechEngagement,
+        FacialConfidence, FacialApproachability, FacialEngagement, VideoProfessionalism, totalScore
+    FROM videoScore
+    WHERE videoID = p_video_id;
+END;
+$$ LANGUAGE plpgsql;
