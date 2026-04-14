@@ -80,7 +80,7 @@ def compare_reports(v1, v2):
     return data
 
 
-def set_weights(user_id: int, weights: Dict[str, float]):
+def set_weights(user_id: int, weights: dict[str, float]):
     conn = get_db_connection()
     cur = conn.cursor()
 

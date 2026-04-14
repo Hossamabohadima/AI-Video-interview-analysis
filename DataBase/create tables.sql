@@ -3,7 +3,7 @@ CREATE TYPE user_role AS ENUM ('USER', 'RECRUITER');
 CREATE TYPE videoStatus AS ENUM ('DONE', 'FAILED', 'PENDING');
 
 -- 2. Create Users table
-CREATE or replace TABLE Users (
+CREATE TABLE Users (
     userid SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -13,12 +13,12 @@ CREATE or replace TABLE Users (
     role user_role NOT NULL 
 );
 -- 3. Create Threshold table
-CREATE or replace TABLE Threshold (
+CREATE TABLE Threshold (
     userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
     thresholdValue DECIMAL(5,2) NOT NULL
 );
 -- 4. Create MetricWeight table
-CREATE or replace TABLE MetricWeight (
+CREATE TABLE MetricWeight (
     userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
    SpeechClarity DECIMAL(5,2) default 0,
    SpeechFluency DECIMAL(5,2) default 0,
@@ -30,11 +30,11 @@ CREATE or replace TABLE MetricWeight (
    FacialEngagement DECIMAL(5,2) default 0,
    VideoProfessionalism DECIMAL(5,2) default 0
     CONSTRAINT metric_score_limit 
-    CHECK (SpeechClarity + SpeechFluency + SpeechConfidence + SpeechExpressiveness + SpeechEngagement + FacialConfidence + FacialApproachability + FacialEngagement + VideoProfessionalism ==1)
+    CHECK (SpeechClarity + SpeechFluency + SpeechConfidence + SpeechExpressiveness + SpeechEngagement + FacialConfidence + FacialApproachability + FacialEngagement + VideoProfessionalism = 1.0)
 
 );
 -- 5. Create Video table
-CREATE or replace TABLE Video (
+CREATE TABLE Video (
     videoID SERIAL PRIMARY KEY,
     VideoName VARCHAR(50) NOT NULL,
     userID int REFERENCES Users(userid) ON DELETE CASCADE,
@@ -43,7 +43,7 @@ CREATE or replace TABLE Video (
     status videoStatus NOT NULL 
 );
 -- 6. Create videoScore table
-CREATE or replace TABLE videoScore (
+CREATE   TABLE videoScore (
     videoID int PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
    SpeechClarity DECIMAL(5,2) default 0,
    SpeechFluency DECIMAL(5,2) default 0,
