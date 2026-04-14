@@ -1,9 +1,9 @@
 -- 1. Create the custom type 
 CREATE TYPE user_role AS ENUM ('USER', 'RECRUITER');
-CREATE TYPE videoStatus AS ENUM ('DONE', 'FAILED');
+CREATE TYPE videoStatus AS ENUM ('DONE', 'FAILED', 'PENDING');
 
 -- 2. Create Users table
-CREATE TABLE Users (
+CREATE or replace TABLE Users (
     userid SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -13,12 +13,12 @@ CREATE TABLE Users (
     role user_role NOT NULL 
 );
 -- 3. Create Threshold table
-CREATE TABLE Threshold (
+CREATE or replace TABLE Threshold (
     userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
     thresholdValue DECIMAL(5,2) NOT NULL
 );
 -- 4. Create MetricWeight table
-CREATE TABLE MetricWeight (
+CREATE or replace TABLE MetricWeight (
     userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
    SpeechClarity DECIMAL(5,2) default 0,
    SpeechFluency DECIMAL(5,2) default 0,
@@ -34,7 +34,7 @@ CREATE TABLE MetricWeight (
 
 );
 -- 5. Create Video table
-CREATE TABLE Video (
+CREATE or replace TABLE Video (
     videoID SERIAL PRIMARY KEY,
     VideoName VARCHAR(50) NOT NULL,
     userID int REFERENCES Users(userid) ON DELETE CASCADE,
@@ -43,7 +43,7 @@ CREATE TABLE Video (
     status videoStatus NOT NULL 
 );
 -- 6. Create videoScore table
-CREATE TABLE videoScore (
+CREATE or replace TABLE videoScore (
     videoID int PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
    SpeechClarity DECIMAL(5,2) default 0,
    SpeechFluency DECIMAL(5,2) default 0,
