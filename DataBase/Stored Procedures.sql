@@ -47,20 +47,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE set_threshold_score(
+CREATE OR REPLACE FUNCTION set_threshold_score(
     p_user_id INT,
     p_score FLOAT
 )
+RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS $$
 BEGIN
     UPDATE threshold
     SET thresholdvalue = p_score
     WHERE userid = p_user_id;
+
+    IF NOT FOUND THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN TRUE;
 END;
 $$;
 
-CREATE OR REPLACE PROCEDURE set_weights_sp(
+CREATE OR REPLACE FUNCTION set_weights_fn(
     p_user_id INT,
     p_SpeechClarity DECIMAL,
     p_SpeechFluency DECIMAL,
@@ -72,6 +79,7 @@ CREATE OR REPLACE PROCEDURE set_weights_sp(
     p_FacialEngagement DECIMAL,
     p_VideoProfessionalism DECIMAL
 )
+RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS $$
 BEGIN
@@ -86,6 +94,12 @@ BEGIN
         FacialEngagement = p_FacialEngagement,
         VideoProfessionalism = p_VideoProfessionalism
     WHERE userID = p_user_id;
+
+    IF NOT FOUND THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN TRUE;
 END;
 $$;
 CREATE OR REPLACE FUNCTION add_video(
