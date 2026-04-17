@@ -4,11 +4,11 @@ from typing import Optional
 
 class SignUpRequest(BaseModel):
     """Schema for user sign up request"""
-    name: str = Field(..., min_length=1, max_length=50)
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    phone_number: Optional[str] = Field(None, max_length=20)
-    role: str = Field(default="USER")
+    name: str = Field(..., min_length=1, max_length=50, description="User's full name")
+    email: EmailStr = Field(..., description="User's email address")
+    password: str = Field(..., min_length=8, description="Password (minimum 8 characters)")
+    phone_number: Optional[str] = Field(None, max_length=20, description="User's phone number")
+    role: str = Field(default="USER", description="User role: USER or RECRUITER")
 
 
 class SignUpResponse(BaseModel):
@@ -16,13 +16,14 @@ class SignUpResponse(BaseModel):
     user_id: int
     name: str
     email: str
+    token: Optional[str] = None
     message: str
 
 
 class LoginRequest(BaseModel):
     """Schema for user login request"""
-    email: EmailStr
-    password: str
+    email: EmailStr = Field(..., description="User's email address")
+    password: str = Field(..., description="User's password")
 
 
 class LoginResponse(BaseModel):
@@ -30,4 +31,6 @@ class LoginResponse(BaseModel):
     user_id: int
     name: str
     email: str
-    token: Optional[str] = None
+    role: str
+    token: str
+    message: str
