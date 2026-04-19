@@ -1,6 +1,6 @@
 
 from BackEnd.app.schemas.video import MetricWeights, video, Scores 
-# from BackEnd.app.analysis_models import IAnalysisModel
+from BackEnd.app.analysis_models import IAnalysisModel
 from db import get_db_connection
 
 
