@@ -1,0 +1,87 @@
+from xml.parsers.expat import model
+from pyexpat import model
+import cv2
+from deepface import DeepFace
+from BackEnd.app.models.I_Analysis_Model import IAnalysisModel
+from BackEnd.app.schemas.video import MetricWeights, Scores, video
+
+# helper functions for facial analysis
+
+def face_emotion(cap):
+    print("Processing video... this may take a minute.")
+    
+    # Initialize dictionary to store the sum of emotion scores
+    emotion_sums = {
+        'angry': 0.0, 'disgust': 0.0, 'fear': 0.0, 
+        'happy': 0.0, 'sad': 0.0, 'surprise': 0.0, 'neutral': 0.0
+    }
+    
+    frame_count = 0
+    analyzed_count = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Analyze every 10th frame to speed things up
+        if frame_count % 10 == 0:
+            try:
+                # DeepFace.analyze returns a list (in case of multiple faces)
+                # enforce_detection=False prevents the code from crashing if no face is found
+                results = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+                
+                # Assume we are tracking the primary face (index 0)
+                emotions = results[0]['emotion']
+                
+                for emotion, score in emotions.items():
+                    if emotion in emotion_sums:
+                        emotion_sums[emotion] += score
+                
+                analyzed_count += 1
+                print ("analyzed_count:",analyzed_count)
+
+            except Exception as e:
+                print(f"Error occurred at frame {frame_count}: {e}")
+
+        frame_count += 1
+
+    cap.release()
+    
+    # Calculate average emotion scores
+    if analyzed_count > 0:
+        average_emotions = {emotion: (score / analyzed_count) for emotion, score in emotion_sums.items()}
+    else:
+        average_emotions = {emotion: 0.0 for emotion in emotion_sums}
+
+    print("Done!")
+    return average_emotions
+
+def eye_contact(cap):
+    # not implemented yet.
+    return 0
+
+# main class for facial analysis
+class FacialAnalysis(IAnalysisModel):
+    def __init__(self):
+        super().__init__("FacialAnalysis")
+        self.model = None
+
+    def load_model(self):
+        self.model = model.load_model("base")
+
+    def analyze(self, video: video, weights: MetricWeights) -> Scores:
+        # where to get the path?? leave it for now as an attribute of video
+        cap = cv2.VideoCapture(video.video_path)
+        face_emotions = face_emotion(cap)
+        eye_contact_score = eye_contact(cap)
+
+        # final Scores (metrics) calculation ?? 
+        # we should agree in a standard metrics and then use the output
+        
+        # totalscore = (
+        # )
+
+        # return totalscore
+
+        return 0
