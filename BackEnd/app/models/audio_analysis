@@ -1,32 +1,29 @@
-from BackEnd.app.models.I_Analysis_Model import IAnalysisModel
-from BackEnd.app.schemas.video import MetricWeights, Scores, video
-
+from .IAnalysisModel import IAnalysisModel, AnalysisInput
 from pyAudioAnalysis import audioBasicIO, ShortTermFeatures
 import numpy as np
 
-
 # helper functions for audio analysis
-def calculate_speech_energy(audio_output_path):
+def calculate_speech_energy(audio_path):
     """
     Calculates energy statistics for a given audio file.
 
     Args:
-        audio_output_path (str): Path to the audio file to analyze.
+        audio_path (str): Path to the audio file to analyze.
 
     Returns:
         dict: Average, Max, Min, and Std of the speech energy.
     """
+
     # sample_rate is the sampling rate (how many discrete numbers he capture each second) -Hz-
     # x is the actual array data for wave, numpay array (should be Hz * num of seconds)
     # audioBasicIO auto detect a good number for sampling rate (Fs) from the video
-    
-    sample_rate, audio_signal = audioBasicIO.read_audio_file(audio_output_path)
+    sample_rate, audio_signal = audioBasicIO.read_audio_file(audio_path)
 
     # pyAudioAnalysis library expect mono voice
     audio_signal = audioBasicIO.stereo_to_mono(audio_signal)
+    
     # 50ms window, 25ms step
     # overlap to catch all features in voice
-
     win = int(0.050 * sample_rate)
     step = int(0.025 * sample_rate)
 
@@ -57,30 +54,50 @@ def calculate_speech_energy(audio_output_path):
 
     return stats
 
-def speech_continuity(audio_output_path):
+def speech_continuity(audio_path):
+    """
+    Estimate speech continuity quality for an audio file.
+
+    Args:
+        audio_path (str): Path to the audio file to analyze.
+
+    Returns:
+        int: Placeholder continuity score (currently not implemented).
+    """
     # not implemented yet.
     return 0
 
 # main class for audio analysis
 class AudioAnalysis(IAnalysisModel):
+    """
+    Implements the IAnalysisModel interface to extract audio-based interview metrics.
+
+    This class currently computes energy statistics and a placeholder continuity score.
+    """
     def __init__(self):
+        """
+        Initialize the audio analysis model.
+        """
         super().__init__("AudioAnalysis")
         self.model = None
 
-    def load_model(self):
-        # no model to load for audio analysis
-        pass
+    def analyze(self, input_data: AnalysisInput) -> dict:
+        """
+        Analyze an audio file for speech energy and continuity metrics.
 
-    def analyze(self, video: video, weights: MetricWeights) -> Scores:
-        # where to get the path?? leave it for now as an attribute of video
-        energy_stats = calculate_speech_energy(video.audio_path)
-        continuity_score = speech_continuity(video.audio_path)
+        Args:
+            input_data (AnalysisInput): Input model containing audio_path.
 
-        # final Scores (metrics) calculation ?? 
-        # we should agree in a standard metrics and then use the output
-        
-        # totalscore = (
-        # )
+        Returns:
+            dict: A dictionary containing computed audio metrics (energy statistics and continuity score).
+        """
+        if not input_data.audio_path:
+            raise ValueError("AudioAnalysis requires input_data.audio_path")
 
-        # return totalscore
-        return 0
+        energy_stats = calculate_speech_energy(input_data.audio_path)
+        continuity_score = speech_continuity(input_data.audio_path)
+
+        return {
+            "energy_stats": energy_stats,
+            "continuity_score": continuity_score
+        }
