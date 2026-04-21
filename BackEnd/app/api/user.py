@@ -2,12 +2,13 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Dict
 from schemas.Threshold import Threshold
 from services.user_service import (
-    get_reports,
-    compare_reports,
-    set_weights,
+    get_reports, 
+    compare_reports, 
+    set_weights, 
     set_threshold_score,
-    upload_video
 )
+from services.video import handle_uploaded_video
+
 
 router = APIRouter()
 
@@ -40,23 +41,8 @@ def update_threshold(req: Threshold):
 
 
 @router.post("/uploadVideo")
-def upload(
-    file: UploadFile = File(...),
-    user_id: int = Form(...),
-    video_name: str = Form(...)
-):
-    try:
-        if not file:
-            raise HTTPException(status_code=400, detail="File is required")
-
-        result = upload_video(file, user_id, video_name)
-        if not result:
-            raise HTTPException(status_code=400, detail="Video upload failed")
-
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+def upload(file: UploadFile = File(...), user_id: int = Form(...), video_name: str = Form(...)):
+    return handle_uploaded_video(file, user_id, video_name)
 
 @router.put("/weights")
 def update_weights(user_id: int, weights: Dict[str, float]):

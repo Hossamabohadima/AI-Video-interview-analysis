@@ -193,7 +193,7 @@ def get_word_repetition(text):
     # return sorted dict
     return dict(repetition_counts.most_common())
 
-#download necessary nltk data and load whisper model
+# download necessary nltk data and load whisper model
 model = whisper.load_model("medium.en")# base faster but less accurate
 nltk.download('punkt')
 nltk.download('punkt_tab')

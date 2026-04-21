@@ -5,7 +5,7 @@ import os
 def run_ffmpeg_command(command):
     """Helper to run ffmpeg command"""
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print(result)
+    # print(result)
     #result is a obj, which has returncode, stdout, and stderr
     if result.returncode != 0:
         raise Exception(f"FFmpeg Error: {result.stderr.decode()}")
@@ -110,4 +110,5 @@ def standardize_video(input_file, output_file="final_output.mp4"):
         if os.path.exists(f):
             os.remove(f)
 
-    print("Done")
+    # print("Done")
+    return output_file
