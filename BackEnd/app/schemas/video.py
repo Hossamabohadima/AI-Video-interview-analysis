@@ -28,4 +28,3 @@ class MetricWeights(BaseModel):
     facialConfidence: float = 0.0
     facialApproachability: float = 0.0
     facialEngagement: float = 0.0
-    videoProfessionalism: float = 0.0

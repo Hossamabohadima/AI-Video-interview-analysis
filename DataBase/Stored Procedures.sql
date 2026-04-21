@@ -188,3 +188,30 @@ BEGIN
     WHERE videoID = p_video_id;
 END;
 $$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE PROCEDURE insert_video_scores(
+    p_video_id INTEGER,
+    p_speechClarity DECIMAL(5,2),
+    p_speechFluency DECIMAL(5,2),
+    p_speechConfidence DECIMAL(5,2),
+    p_speechExpressiveness DECIMAL(5,2),
+    p_speechEngagement DECIMAL(5,2),
+    p_facialConfidence DECIMAL(5,2),
+    p_facialApproachability DECIMAL(5,2),
+    p_facialEngagement DECIMAL(5,2),
+    p_videoProfessionalism DECIMAL(5,2),
+    p_totalScore DECIMAL(5,2)
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO videoScore (
+        videoID, SpeechClarity, SpeechFluency, SpeechConfidence, SpeechExpressiveness, SpeechEngagement,
+        FacialConfidence, FacialApproachability, FacialEngagement, VideoProfessionalism, totalScore
+    ) VALUES (
+        p_video_id, p_speechClarity, p_speechFluency, p_speechConfidence, p_speechExpressiveness, p_speechEngagement,
+        p_facialConfidence, p_facialApproachability, p_facialEngagement, p_videoProfessionalism, p_totalScore
+    );
+END;
+$$;
