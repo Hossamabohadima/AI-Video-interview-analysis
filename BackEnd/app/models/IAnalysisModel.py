@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Optional
+from pydantic import BaseModel
+from typing import Optional
 
 # helper class to hold the input data for analysis models
 class AnalysisInput(BaseModel):

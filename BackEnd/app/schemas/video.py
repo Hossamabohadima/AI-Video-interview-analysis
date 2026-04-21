@@ -16,6 +16,7 @@ class Scores(BaseModel):
     facialConfidence: float
     facialApproachability: float
     facialEngagement: float
+    videoProfessionalism: float
     totalScore: float
 
 class MetricWeights(BaseModel):

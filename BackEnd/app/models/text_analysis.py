@@ -1,4 +1,4 @@
-from .IAnalysisModel import IAnalysisModel
+from .IAnalysisModel import IAnalysisModel, AnalysisInput
 from nltk.corpus import stopwords
 from collections import Counter
 import nltk
@@ -134,16 +134,24 @@ class TextAnalysis(IAnalysisModel):
         super().__init__("TextAnalysis")
         self.model = None
 
-    def analyze(self, whisper_result: dict) -> dict:
+    def analyze(self, input_data: AnalysisInput) -> dict:
         """
         Analyze the Whisper result to compute text-related metrics.
 
         Args:
-            whisper_result (dict): The result dictionary from Whisper transcription.
+            input_data (AnalysisInput): Input model containing whisper_result.
 
         Returns:
             dict: A dictionary containing computed metrics like speech_rate, pause_rate, etc.
         """
+        if not input_data.whisper_result:
+            raise ValueError("TextAnalysis requires input_data.whisper_result")
+
+        whisper_result = input_data.whisper_result
+        if not input_data.whisper_result:
+            raise ValueError("TextAnalysis requires input_data.whisper_result")
+
+        whisper_result = input_data.whisper_result
         words, full_text = extract_words_and_text(whisper_result)
         speech_rate_val = speech_rate(words)
         pause_rate_val = pause_rate(words)
