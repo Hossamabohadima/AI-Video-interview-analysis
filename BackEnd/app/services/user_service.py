@@ -87,7 +87,7 @@ def set_weights(user_id: int, weights: dict[str, float]):
     w = weights
 
     cur.execute("""
-        CALL set_weights_sp(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        SELECT set_weights_fn(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         user_id,
         w["SpeechClarity"],
@@ -101,16 +101,27 @@ def set_weights(user_id: int, weights: dict[str, float]):
         w["VideoProfessionalism"]
     ))
 
+    result = cur.fetchone()[0]
+
     conn.commit()
     cur.close()
     conn.close()
+
+    return result
 
 def set_threshold_score(user_id: int, score: float):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("CALL set_threshold_score(%s, %s)", (user_id, score))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute("SELECT set_threshold_score(%s, %s)", (user_id, score))
+        success = cur.fetchone()[0]
+        conn.commit()
+        return success
+    except Exception as e:
+        conn.rollback()
+        print("DB error:", e)
+        return False
+    finally:
+        cur.close()
+        conn.close()
