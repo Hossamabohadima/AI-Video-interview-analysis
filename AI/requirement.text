@@ -7,3 +7,5 @@ eyed3
 pyAudioAnalysis
 ffmpeg
 nltk
+mediapipe
+opencv-python
