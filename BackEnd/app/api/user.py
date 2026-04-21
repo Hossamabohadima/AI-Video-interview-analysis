@@ -7,7 +7,7 @@ from services.user_service import (
     set_weights, 
     set_threshold_score,
 )
-from services.video import handle_video_upload
+from services.video import handle_uploaded_video
 
 
 router = APIRouter()
@@ -28,7 +28,7 @@ def update_threshold(req: Threshold):
 
 @router.post("/uploadVideo")
 def upload(file: UploadFile = File(...), user_id: int = Form(...), video_name: str = Form(...)):
-    return handle_video_upload(file, user_id, video_name)
+    return handle_uploaded_video(file, user_id, video_name)
 
 @router.put("/weights")
 def update_weights(user_id: int, weights: Dict[str, float]):
