@@ -12,6 +12,8 @@ import shutil
 import json
 import whisper
 import subprocess
+import torch
+import mediapipe as mp
 
 
 def _extract_audio_from_video(video_path: str) -> str:
@@ -97,7 +99,6 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         videoProfessionalism=0.0,
         totalScore=0.0
     )
-
 
 def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
     folder = "videos"
@@ -187,21 +188,50 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
 
     audio_path = None
     try:
-        # handle inputs
+        # 1. Load dependencies for model initialization
+        # Load Silero VAD model and utilities
+        vad_model = torch.jit.load('../AI/silero_vad.task')
+        _, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
+        get_speech_timestamps, _, _, _, _ = utils
+
+        # Load Face Landmarker configuration
+        model_path = '../AI/face_landmarker.task'
+        BaseOptions = mp.tasks.BaseOptions
+        FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
+
+        face_options = FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=model_path),
+            running_mode=VisionRunningMode.VIDEO,
+            num_faces=1,
+            output_face_blendshapes=True,
+        )
+
+        # 2. Extract raw data (Audio and Transcription)
         audio_path = _extract_audio_from_video(video_path)
         whisper_model = whisper.load_model("medium.en")  # type: ignore
         whisper_result = whisper_model.transcribe(audio_path, word_timestamps=True)
 
-        facial_model = FacialAnalysis()
-        audio_model = AudioAnalysis()
-        text_model = TextAnalysis()
+        # 3. Instantiate models with injected dependencies
+        facial_model = FacialAnalysis(face_options=face_options)
+        audio_model = AudioAnalysis(vad_model=vad_model, get_speech_timestamps=get_speech_timestamps)
+        text_model = TextAnalysis() # Kept as is
 
-        text_results = text_model.analyze(AnalysisInput(whisper_result=whisper_result))
-        facial_results = facial_model.analyze(AnalysisInput(video_path=video_path))
-        audio_results = audio_model.analyze(AnalysisInput(audio_path=audio_path))
+        # 4. Create unified input object
+        analysis_input = AnalysisInput(
+            audio_path=audio_path,
+            video_path=video_path,
+            whisper_result=whisper_result
+        )
+
+        # 5. Execute analysis via the standardized interface
+        text_results = text_model.analyze(analysis_input)
+        facial_results = facial_model.analyze(analysis_input)
+        audio_results = audio_model.analyze(analysis_input)
 
         scores = scoring(facial_results, audio_results, text_results, weights)
         return scores
+
     except Exception as e:
         print(f"Error processing video {video_id}: {e}")
         # Return default scores to prevent crash
@@ -223,12 +253,6 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
                 os.remove(audio_path)
             except OSError:
                 pass
-
-
-def add_analysis_model(model: IAnalysisModel):
-    # logic?
-    # return None
-    pass
 
 def get_scores(video_id: int) -> Scores | None:
     conn = get_db_connection()
