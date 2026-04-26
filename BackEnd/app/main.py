@@ -1,5 +1,8 @@
 from fastapi import FastAPI
-from api.user import router as user_router 
+from .api.user import router as user_router
+from .api.user_auth import router as auth_router
+from .api.metrics import router as metrics_router
+from .api.scores import router as scores_router
 
 # 1. Change the Title and the URL path
 app = FastAPI(
@@ -8,6 +11,9 @@ app = FastAPI(
     redoc_url=None           # Optional: disables the alternative /redoc path
 )
 
+app.include_router(auth_router)
+app.include_router(metrics_router)
+app.include_router(scores_router)
 app.include_router(user_router)
 
 # 2. Print the custom URL to the terminal

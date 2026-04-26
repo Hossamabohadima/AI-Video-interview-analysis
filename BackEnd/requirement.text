@@ -1,4 +1,10 @@
-pydantic
+pydantic[email]
 fastapi
+uvicorn
 moviepy
 psycopg2
+psycopg2-binary
+PyJWT
+passlib[bcrypt]
+python-multipart
+starlette
