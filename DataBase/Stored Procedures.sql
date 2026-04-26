@@ -156,12 +156,12 @@ $$;
 
 
 CREATE OR REPLACE FUNCTION login_user_sp(p_email TEXT, p_password TEXT)
-RETURNS TABLE(userid INT, name TEXT, role user_role) AS $$
+RETURNS TABLE(userid INT, name TEXT, role user_role, password TEXT) AS $$
 BEGIN
     RETURN QUERY
-    SELECT u.userid, u.name, u.role
+    SELECT u.userid, u.name::TEXT, u.role, u.password
     FROM Users u
-    WHERE u.email = p_email AND u.password = p_password;
+    WHERE u.email = p_email;
 END;
 $$ LANGUAGE plpgsql;
 

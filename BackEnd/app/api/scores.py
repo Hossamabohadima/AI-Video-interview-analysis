@@ -1,0 +1,24 @@
+from fastapi import APIRouter, HTTPException, status, Depends
+from ..schemas.video import Scores
+from ..services.scores_service import get_video_scores
+from ..utils.dependencies import get_current_user
+
+router = APIRouter(prefix="/scores", tags=["scores"])
+
+
+@router.get("/{video_id}", response_model=Scores)
+async def get_scores(video_id: int, current_user: dict = Depends(get_current_user)):
+    """Retrieve scores for a specific video."""
+    try:
+        scores = await get_video_scores(video_id)
+        return scores
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve scores"
+        )
