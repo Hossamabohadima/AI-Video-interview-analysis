@@ -65,19 +65,26 @@ def _insert_scores(video_id: int, scores: Scores):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.callproc('insert_video_scores', (
-            video_id,
-            scores.speech_clarity,
-            scores.speech_fluency,
-            scores.speech_confidence,
-            scores.speech_expressiveness,
-            scores.speech_engagement,
-            scores.facial_confidence,
-            scores.facial_approachability,
-            scores.facial_engagement,
-            scores.video_professionalism,
-            scores.total_score
+       # Using cur.execute with the CALL keyword
+        query = """
+        CALL insert_video_scores(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        cur.execute(query, (
+        video_id,
+        scores.speech_clarity,
+        scores.speech_fluency,
+        scores.speech_confidence,
+        scores.speech_expressiveness,
+        scores.speech_engagement,
+        scores.facial_confidence,
+        scores.facial_approachability,
+        scores.facial_engagement,
+        scores.video_professionalism,
+        scores.total_score
         ))
+
+        # Crucial: Don't forget to commit if you aren't using an autocommit connection
+        # conn.commit()
         conn.commit()
     except Exception as e:
         conn.rollback()
