@@ -8,3 +8,5 @@ PyJWT
 passlib[bcrypt]
 python-multipart
 starlette
+tf-keras
+bcrypt

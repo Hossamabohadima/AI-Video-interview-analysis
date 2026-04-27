@@ -9,3 +9,4 @@ ffmpeg
 nltk
 mediapipe
 opencv-python
+tf-keras
