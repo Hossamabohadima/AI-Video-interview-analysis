@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 DB_CONFIG = {
     "dbname": "interview_ai",
     "user": "postgres",
-    "password": "123456789",
+    "password": "122333",#122333
     "host": "127.0.0.1",
     "port": "5432"
 }
