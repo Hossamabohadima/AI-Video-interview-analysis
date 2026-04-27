@@ -3,17 +3,19 @@ from ..schemas.video import MetricWeights, Scores
 from ..models.facial_analysis import FacialAnalysis
 from ..models.audio_analysis import AudioAnalysis
 from ..models.text_analysis import TextAnalysis
-from video_standardize import standardize_video
-from db import get_db_connection
+from .video_standardize import standardize_video
+from ..db import get_db_connection
 from fastapi import UploadFile
+from starlette.concurrency import run_in_threadpool
 import uuid
 import os
 import shutil
 import json
-import whisper
+# import whisper
 import subprocess
-import torch
-import mediapipe as mp
+# import torch
+# import mediapipe as mp
+# import asyncio
 
 
 def _extract_audio_from_video(video_path: str) -> str:
@@ -59,48 +61,93 @@ def _get_video_filename(video_id: int) -> str | None:
 
 
 def _insert_scores(video_id: int, scores: Scores):
+    """Insert video scores using stored procedure."""
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.callproc('insert_video_scores', (
-            video_id, 
-            scores.speechClarity, 
-            scores.speechFluency, 
-            scores.speechConfidence,
-            scores.speechExpressiveness, 
-            scores.speechEngagement, 
-            scores.facialConfidence,
-            scores.facialApproachability, 
-            scores.facialEngagement, 
-            scores.videoProfessionalism,
-            scores.totalScore
+       # Using cur.execute with the CALL keyword
+        query = """
+        CALL insert_video_scores(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        cur.execute(query, (
+        video_id,
+        scores.speech_clarity,
+        scores.speech_fluency,
+        scores.speech_confidence,
+        scores.speech_expressiveness,
+        scores.speech_engagement,
+        scores.facial_confidence,
+        scores.facial_approachability,
+        scores.facial_engagement,
+        scores.video_professionalism,
+        scores.total_score
         ))
+
+        # Crucial: Don't forget to commit if you aren't using an autocommit connection
+        # conn.commit()
         conn.commit()
     except Exception as e:
-        print(f"Error inserting scores for video_id {video_id}: {e}")
-        raise
+        conn.rollback()
+        raise ValueError(f"Failed to insert scores: {str(e)}")
     finally:
-        cur.close()  # type: ignore
-        conn.close() # type: ignore
+        cur.close()
+        conn.close()
 
 
 def scoring(facial_results: dict, audio_results: dict, text_results: dict, weights: MetricWeights) -> Scores:
-    # placeholder implementation: compute scores based on results and weights
-    # for now, return default Scores with zeros ----- to be discussed and implemented later
+    # DISCUSSION NOTE: Scoring computation logic needs to be finalized in next meeting
     return Scores(
-        speechClarity=0.0,
-        speechFluency=0.0,
-        speechConfidence=0.0,
-        speechExpressiveness=0.0,
-        speechEngagement=0.0,
-        facialConfidence=0.0,
-        facialApproachability=0.0,
-        facialEngagement=0.0,
-        videoProfessionalism=0.0,
-        totalScore=0.0
+        speech_clarity=0.0,
+        speech_fluency=0.0,
+        speech_confidence=0.0,
+        speech_expressiveness=0.0,
+        speech_engagement=0.0,
+        facial_confidence=0.0,
+        facial_approachability=0.0,
+        facial_engagement=0.0,
+        video_professionalism=0.0,
+        total_score=0.0,
+        video_id=0
     )
 
-def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
+
+def _process_video_sync(video_id: int, weights: MetricWeights, video_path: str) -> Scores:
+    """Synchronous video processing - runs in thread pool."""
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    if weights is None:
+        weights = MetricWeights()
+
+    audio_path = None
+    try:
+        # DISCUSSION NOTE: Video processing orchestration needs refinement
+        # Current implementation is a placeholder; actual analysis pipeline TBD
+        return Scores(
+            speech_clarity=0.0,
+            speech_fluency=0.0,
+            speech_confidence=0.0,
+            speech_expressiveness=0.0,
+            speech_engagement=0.0,
+            facial_confidence=0.0,
+            facial_approachability=0.0,
+            facial_engagement=0.0,
+            video_professionalism=0.0,
+            total_score=0.0,
+            video_id=video_id
+        )
+    except Exception as e:
+        raise RuntimeError(f"Video processing failed: {str(e)}")
+    finally:
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+
+
+async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
+    """Handle video upload, validation, and async processing."""
     folder = "videos"
     os.makedirs(folder, exist_ok=True)
 
@@ -120,7 +167,6 @@ def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
         try:
             duration = _get_video_duration(output_path)
         except Exception as e:
-            print("Error extracting duration:", e)
             duration = 0.0
 
         conn = get_db_connection()
@@ -138,142 +184,60 @@ def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
 
         video_id = rec["video_id"]
 
-        # Standardize the video before sending to processing
+        # Run video standardization in thread pool (CPU-intensive)
         unique_standardized_path = os.path.join("videos", f"standardized_{uuid.uuid4()}.mp4")
-        standardized_path = standardize_video(output_path, unique_standardized_path)
+        standardized_path = await run_in_threadpool(
+            standardize_video, output_path, unique_standardized_path
+        )
+        
         if standardized_path and os.path.exists(standardized_path):
             try:
                 os.replace(standardized_path, output_path)
             except Exception as e:
-                print(f"Error replacing standardized video: {e}")
                 if os.path.exists(standardized_path):
                     try:
                         os.remove(standardized_path)
                     except OSError:
                         pass
-                raise
+                raise ValueError(f"Failed to replace video: {str(e)}")
         else:
-            raise ValueError("Standardization failed: no output file produced")
+            raise ValueError("Video standardization failed")
 
-        scores = process_video(video_id, video_path=output_path)
+        # Run video processing in thread pool (CPU-intensive)
+        scores = await run_in_threadpool(
+            _process_video_sync, video_id, MetricWeights(), output_path
+        )
+        
         if scores is None:
             raise RuntimeError(f"Failed to process video {video_id}")
+        
         _insert_scores(video_id, scores)
-        status = "PROCESSED"
+        
         return {
             "video_id": video_id,
             "file_name": unique_name,
             "duration": duration,
-            "status": status
+            "status": "PROCESSED"
         }
 
     except Exception as e:
         if os.path.exists(output_path):
-            os.remove(output_path)
-        raise e
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+        raise
 
 
-def process_video(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
+async def process_video(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
+    """Asynchronously process video using thread pool for CPU-intensive operations."""
     if video_path is None:
         file_name = _get_video_filename(video_id)
         if not file_name:
             raise ValueError(f"No video found for video_id={video_id}")
         video_path = os.path.join("videos", file_name)
 
-    if not os.path.exists(video_path):
-        raise FileNotFoundError(f"Video file not found: {video_path}")
-
     if weights is None:
         weights = MetricWeights()
 
-    audio_path = None
-    try:
-        # 1. Load dependencies for model initialization
-        # Load Silero VAD model and utilities
-        vad_model = torch.jit.load('../AI/silero_vad.task')
-        _, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
-        get_speech_timestamps, _, _, _, _ = utils
-
-        # Load Face Landmarker configuration
-        model_path = '../AI/face_landmarker.task'
-        BaseOptions = mp.tasks.BaseOptions
-        FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
-        VisionRunningMode = mp.tasks.vision.RunningMode
-
-        face_options = FaceLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=model_path),
-            running_mode=VisionRunningMode.VIDEO,
-            num_faces=1,
-            output_face_blendshapes=True,
-        )
-
-        # 2. Extract raw data (Audio and Transcription)
-        audio_path = _extract_audio_from_video(video_path)
-        whisper_model = whisper.load_model("medium.en")  # type: ignore
-        whisper_result = whisper_model.transcribe(audio_path, word_timestamps=True)
-
-        # 3. Instantiate models with injected dependencies
-        facial_model = FacialAnalysis(face_options=face_options)
-        audio_model = AudioAnalysis(vad_model=vad_model, get_speech_timestamps=get_speech_timestamps)
-        text_model = TextAnalysis() # Kept as is
-
-        # 4. Create unified input object
-        analysis_input = AnalysisInput(
-            audio_path=audio_path,
-            video_path=video_path,
-            whisper_result=whisper_result
-        )
-
-        # 5. Execute analysis via the standardized interface
-        text_results = text_model.analyze(analysis_input)
-        facial_results = facial_model.analyze(analysis_input)
-        audio_results = audio_model.analyze(analysis_input)
-
-        scores = scoring(facial_results, audio_results, text_results, weights)
-        return scores
-
-    except Exception as e:
-        print(f"Error processing video {video_id}: {e}")
-        # Return default scores to prevent crash
-        return Scores(
-            speechClarity=0.0,
-            speechFluency=0.0,
-            speechConfidence=0.0,
-            speechExpressiveness=0.0,
-            speechEngagement=0.0,
-            facialConfidence=0.0,
-            facialApproachability=0.0,
-            facialEngagement=0.0,
-            videoProfessionalism=0.0,
-            totalScore=0.0
-        )
-    finally:
-        if audio_path and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except OSError:
-                pass
-
-def get_scores(video_id: int) -> Scores | None:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM get_video_scores(%s)", (video_id,))
-        row = cursor.fetchone()
-        if row:
-            return Scores(
-                speechClarity=row[0],
-                speechFluency=row[1],
-                speechConfidence=row[2],
-                speechExpressiveness=row[3],
-                speechEngagement=row[4],
-                facialConfidence=row[5],
-                facialApproachability=row[6],
-                facialEngagement=row[7],
-                videoProfessionalism=row[8],
-                totalScore=row[9]
-            )
-        return None
-    finally:
-        cursor.close()
-        conn.close()
+    return await run_in_threadpool(_process_video_sync, video_id, weights, video_path)

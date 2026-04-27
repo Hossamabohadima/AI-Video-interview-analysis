@@ -2,7 +2,7 @@ CREATE OR REPLACE FUNCTION get_reports_sp(p_user_id INT)
 RETURNS TABLE(
     videoid INT,
     uploadDate TIMESTAMP,
-    duration DECIMAL ,
+    duration DECIMAL,
     status videoStatus, 
     videoname varchar(50),
     SpeechClarity DECIMAL,
@@ -18,7 +18,22 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT *
+    SELECT 
+        v.videoid,
+        v.uploaddate::TIMESTAMP, -- Force cast to match your TIMESTAMP return type
+        v.duration::DECIMAL,
+        v.status,
+        v.videoname,
+        vs.speechclarity::DECIMAL,
+        vs.speechfluency::DECIMAL,
+        vs.speechconfidence::DECIMAL,
+        vs.speechexpressiveness::DECIMAL,
+        vs.speechengagement::DECIMAL,
+        vs.facialconfidence::DECIMAL,
+        vs.facialapproachability::DECIMAL,
+        vs.facialengagement::DECIMAL,
+        vs.videoprofessionalism::DECIMAL,
+        vs.totalscore::DECIMAL
     FROM Video v
     LEFT JOIN videoScore vs ON v.videoid = vs.videoid
     WHERE v.userid = p_user_id;
@@ -27,23 +42,34 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION compare_reports_sp(v1 INT, v2 INT)
 RETURNS TABLE(
-    videoid INT,
-    SpeechClarity DECIMAL,
-    SpeechFluency DECIMAL,
-    SpeechConfidence DECIMAL,
-    SpeechExpressiveness DECIMAL,
-    SpeechEngagement DECIMAL,
-    FacialConfidence DECIMAL,
-    FacialApproachability DECIMAL,
-    FacialEngagement DECIMAL,
-    VideoProfessionalism DECIMAL,
-    totalScore DECIMAL
+    res_videoid INT,
+    res_SpeechClarity DECIMAL,
+    res_SpeechFluency DECIMAL,
+    res_SpeechConfidence DECIMAL,
+    res_SpeechExpressiveness DECIMAL,
+    res_SpeechEngagement DECIMAL,
+    res_FacialConfidence DECIMAL,
+    res_FacialApproachability DECIMAL,
+    res_FacialEngagement DECIMAL,
+    res_VideoProfessionalism DECIMAL,
+    res_totalScore DECIMAL
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT *
-    FROM videoScore
-    WHERE videoScore.videoid = v1 OR videoid = v2;
+    SELECT 
+        vs.videoid,
+        vs.SpeechClarity::DECIMAL,
+        vs.SpeechFluency::DECIMAL,
+        vs.SpeechConfidence::DECIMAL,
+        vs.SpeechExpressiveness::DECIMAL,
+        vs.SpeechEngagement::DECIMAL,
+        vs.FacialConfidence::DECIMAL,
+        vs.FacialApproachability::DECIMAL,
+        vs.FacialEngagement::DECIMAL,
+        vs.VideoProfessionalism::DECIMAL,
+        vs.totalScore::DECIMAL
+    FROM videoScore vs
+    WHERE vs.videoid = v1 OR vs.videoid = v2;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -156,12 +182,12 @@ $$;
 
 
 CREATE OR REPLACE FUNCTION login_user_sp(p_email TEXT, p_password TEXT)
-RETURNS TABLE(userid INT, name TEXT, role user_role) AS $$
+RETURNS TABLE(userid INT, name TEXT, role user_role, password TEXT) AS $$
 BEGIN
     RETURN QUERY
-    SELECT u.userid, u.name, u.role
+    SELECT u.userid, u.name::TEXT, u.role, u.password
     FROM Users u
-    WHERE u.email = p_email AND u.password = p_password;
+    WHERE u.email = p_email;
 END;
 $$ LANGUAGE plpgsql;
 
