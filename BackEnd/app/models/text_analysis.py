@@ -1,8 +1,11 @@
+from pydoc import text
+
 from .IAnalysisModel import IAnalysisModel, AnalysisInput
 from nltk.corpus import stopwords
 from collections import Counter
 import nltk
 import re
+import language_tool_python
 
 class TextAnalysis(IAnalysisModel):
     """
@@ -18,6 +21,7 @@ class TextAnalysis(IAnalysisModel):
         """
         super().__init__("TextAnalysis")
         self.model = None
+        self.grammar_tool = language_tool_python.LanguageTool('en-US')
 
     def _extract_words_and_text(self, whisper_result):
         """
@@ -115,16 +119,35 @@ class TextAnalysis(IAnalysisModel):
 
     def _grammar_mistakes(self, full_text):
         """
-        Calculate the number of grammar mistakes in the full text.
+        Calculate grammar mistakes in the full text.
 
         Args:
             full_text (str): The full text transcript.
 
         Returns:
-            int: Number of grammar mistakes (currently not implemented).
+            list: List of grammar mistake dictionaries with details about each error.
         """
-        # not implemented yet.
-        return 0
+        if not full_text:
+            return []
+        
+        matches = self.grammar_tool.check(full_text)
+        mistakes = []
+        
+        for match in matches:
+            # Only include GRAMMAR category errors
+            if match.category == 'GRAMMAR':
+                mistakes.append({
+                    "category": match.category,
+                    "error_message": match.message,
+                    "incorrect_text": match.context,
+                    "suggestions": match.replacements[:3]  # Top 3 suggestions
+                })
+        num_errors = len(mistakes)
+        word_count = max(len(full_text.split()), 1)
+
+        grammar_score = max(0, 100 - (num_errors / word_count * 100))
+        
+        return mistakes, grammar_score, num_errors, word_count
 
     def analyze(self, input_data: AnalysisInput) -> dict:
         """
@@ -145,7 +168,7 @@ class TextAnalysis(IAnalysisModel):
         pause_rate_val = self._pause_rate(words)
         total_words, filler_count = self._count_fillers(words)
         repetition = self._get_word_repetition(full_text)
-        grammar_errors = self._grammar_mistakes(full_text)
+        grammar_mistakes, grammar_score, num_errors, word_count = self._grammar_mistakes(full_text)
  
         return {
             "speech_rate": speech_rate_val,
@@ -153,5 +176,7 @@ class TextAnalysis(IAnalysisModel):
             "total_words": total_words,
             "filler_count": filler_count,
             "word_repetition": repetition,
-            "grammar_errors": grammar_errors
+            "grammar_errors_count": len(grammar_mistakes),
+            "grammar_errors_details": grammar_mistakes,
+            "grammar_score": grammar_score
         }
