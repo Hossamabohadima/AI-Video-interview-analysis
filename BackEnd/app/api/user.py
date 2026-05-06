@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
 from ..schemas.Threshold import Threshold
+from decimal import Decimal
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
@@ -32,26 +33,24 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
 
 @router.post("/reports/compare", status_code=status.HTTP_200_OK)
 async def compare_user_reports(video1: int, video2: int, current_user: dict = Depends(get_current_user)):
-    """Compare scores between two videos."""
     try:
         result = await compare_reports(video1, video2)
-        if len(result) <= 1:
+        if len(result) < 2: # Changed from <= 1 for clarity
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="At least one video not found for comparison"
             )
         return {"comparison": result}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception:
+    except HTTPException as e:
+        # Re-raise HTTPExceptions so we see the actual 404 or 500 detail
+        raise e
+    except Exception as e:
+        # Log the real error to your terminal!
+        print(f"CRITICAL ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to compare reports"
+            detail=f"Internal Server Error: {str(e)}"
         )
-
 
 @router.put("/threshold", status_code=status.HTTP_200_OK)
 async def update_user_threshold(score: float, current_user: dict = Depends(get_current_user)):

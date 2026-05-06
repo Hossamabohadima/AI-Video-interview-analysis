@@ -1,3 +1,5 @@
+from fastapi import HTTPException
+from decimal import Decimal
 import psycopg2
 import psycopg2.extras
 from ..db import get_db_connection
@@ -19,16 +21,24 @@ async def get_reports(user_id: int):
 
 
 async def compare_reports(v1: int, v2: int):
-    """Compare scores between two videos."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
+    print("dfdff")
     try:
         cur.execute("SELECT * FROM compare_reports_sp(%s, %s)", (v1, v2))
         data = cur.fetchall()
+        print(f"Raw comparison data: {data}")  # Debugging line
+        # Convert Decimal objects to floats for JSON compatibility
+        for row in data:
+            for key, value in row.items():
+                if isinstance(value, Decimal):
+                    row[key] = float(value)
+                    
         return data
     except Exception as e:
-        raise ValueError(f"Failed to compare reports: {str(e)}")
+        # Check your console for the actual error message here
+        print(f"Database Error: {e}") 
+        raise HTTPException(status_code=500, detail=f"Failed to compare reports: {str(e)}")
     finally:
         cur.close()
         conn.close()
