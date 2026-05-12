@@ -20,25 +20,19 @@ CREATE TABLE Threshold (
 -- 4. Create MetricWeight table
 CREATE TABLE MetricWeight (
     userID INT PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
-    speech_rate_weight DECIMAL(5,4) DEFAULT 0,
     fillers_weight DECIMAL(5,4) DEFAULT 0,
     pause_rate_weight DECIMAL(5,4) DEFAULT 0,
     emotion_weight DECIMAL(5,4) DEFAULT 0,
     energy_weight DECIMAL(5,4) DEFAULT 0,
-    word_frequency_weight DECIMAL(5,4) DEFAULT 0,
     eye_contact_weight DECIMAL(5,4) DEFAULT 0,
-    speech_continuity_weight DECIMAL(5,4) DEFAULT 0,
     grammar_weight DECIMAL(5,4) DEFAULT 0,
 
     CONSTRAINT metric_score_limit CHECK (
-        speech_rate_weight +
         fillers_weight +
         pause_rate_weight +
         emotion_weight +
         energy_weight +
-        word_frequency_weight +
         eye_contact_weight +
-        speech_continuity_weight +
         grammar_weight = 1.0
     )
 );
@@ -54,14 +48,11 @@ CREATE TABLE Video (
 -- 6. Create videoScore table
 -- CREATE TABLE videoScore (
 --     videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
---     speech_rate_score DECIMAL(5,2) DEFAULT 0,
 --     fillers_score DECIMAL(5,2) DEFAULT 0,
 --     pause_rate_score DECIMAL(5,2) DEFAULT 0,
 --     emotion_score DECIMAL(5,2) DEFAULT 0,
 --     energy_score DECIMAL(5,2) DEFAULT 0,
---     word_frequency_score DECIMAL(5,2) DEFAULT 0,
 --     eye_contact_score DECIMAL(5,2) DEFAULT 0,
---     speech_continuity_score DECIMAL(5,2) DEFAULT 0,
 --     grammar_score DECIMAL(5,2) DEFAULT 0,
 --     total_score DECIMAL(5,2) DEFAULT 0,
 --     CONSTRAINT score_limit 
@@ -71,14 +62,11 @@ CREATE TABLE Video (
    
 CREATE TABLE VideoAnalysis (
     videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
-    speech_Rate DECIMAL(10,4), 
     fillers_Word JSONB,
     rate_Of_Stop DECIMAL(10,4), 
     emotion_analysis JSONB,
     energy_Statistics JSONB,
-    word_Frequency    JSONB,
     eye_Contact       JSONB,
-    speech_Continuity  DECIMAL(10,4), 
     grammar_Mistakes JSONB,
     total_Score DECIMAL(10,4)
 );
