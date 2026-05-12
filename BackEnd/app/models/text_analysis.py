@@ -15,13 +15,23 @@ class TextAnalysis(IAnalysisModel):
     based on the provided Whisper transcription results.
     """
 
-    def __init__(self):
+    def __init__(self, grammar_tool=None):
         """
         Initialize the TextAnalysis model.
+        
+        Args:
+            grammar_tool (optional): Injected LanguageTool instance. If None, initializes a new one.
         """
         super().__init__("TextAnalysis")
         self.model = None
-        self.grammar_tool = language_tool_python.LanguageTool('en-US')
+        if grammar_tool is not None:
+            self.grammar_tool = grammar_tool
+        else:
+            try:
+                self.grammar_tool = language_tool_python.LanguageTool('en-US')
+            except Exception as e:
+                print(f"Warning: Failed to initialize grammar tool: {e}")
+                self.grammar_tool = None
 
     def _extract_words_and_text(self, whisper_result):
         """
@@ -125,10 +135,13 @@ class TextAnalysis(IAnalysisModel):
             full_text (str): The full text transcript.
 
         Returns:
-            list: List of grammar mistake dictionaries with details about each error.
+            tuple: (mistakes_list, grammar_score, num_errors, word_count)
         """
         if not full_text:
-            return []
+            return [], 100.0, 0, 0
+        
+        if self.grammar_tool is None:
+            return [], 100.0, 0, len(full_text.split())
         
         matches = self.grammar_tool.check(full_text)
         mistakes = []

@@ -11,11 +11,11 @@ import uuid
 import os
 import shutil
 import json
-# import whisper
+import whisper
 import subprocess
-# import torch
-# import mediapipe as mp
-# import asyncio
+import torch
+import mediapipe as mp
+import asyncio
 
 
 def _extract_audio_from_video(video_path: str) -> str:
@@ -145,6 +145,16 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
             output_face_blendshapes=True,
         )
 
+        # Load Grammar Tool for text analysis (handle grammar_mistakes dependencies)
+        grammar_tool = None
+        try:
+            import language_tool_python
+            grammar_tool = language_tool_python.LanguageTool('en-US')
+        except ImportError:
+            print("Warning: language-tool-python not installed. Grammar analysis will be skipped.")
+        except Exception as e:
+            print(f"Warning: Failed to initialize grammar tool: {e}")
+
         # 2. Extract raw data (Audio and Transcription)
         audio_path = _extract_audio_from_video(video_path)
         whisper_model = whisper.load_model("medium.en")  # type: ignore
@@ -153,7 +163,7 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
         # 3. Instantiate models with injected dependencies
         facial_model = FacialAnalysis(face_options=face_options)
         audio_model = AudioAnalysis(vad_model=vad_model, get_speech_timestamps=get_speech_timestamps)
-        text_model = TextAnalysis() # Kept as is
+        text_model = TextAnalysis(grammar_tool=grammar_tool)
 
         # 4. Create unified input object
         analysis_input = AnalysisInput(
@@ -174,16 +184,17 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
         print(f"Error processing video {video_id}: {e}")
         # Return default scores to prevent crash
         return Scores(
-            speechClarity=0.0,
-            speechFluency=0.0,
-            speechConfidence=0.0,
-            speechExpressiveness=0.0,
-            speechEngagement=0.0,
-            facialConfidence=0.0,
-            facialApproachability=0.0,
-            facialEngagement=0.0,
-            videoProfessionalism=0.0,
-            totalScore=0.0
+            video_id=video_id,
+            speech_clarity=0.0,
+            speech_fluency=0.0,
+            speech_confidence=0.0,
+            speech_expressiveness=0.0,
+            speech_engagement=0.0,
+            facial_confidence=0.0,
+            facial_approachability=0.0,
+            facial_engagement=0.0,
+            video_professionalism=0.0,
+            total_score=0.0,
         )
     finally:
         if audio_path and os.path.exists(audio_path):
