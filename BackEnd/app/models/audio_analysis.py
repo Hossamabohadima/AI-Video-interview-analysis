@@ -47,24 +47,6 @@ class AudioAnalysis(IAnalysisModel):
             "std_energy": float(np.std(energy_frames))
         }
 
-    def _speech_continuity(self, audio_path: str) -> float:
-        """Calculate speech continuity score from an audio file.
-
-        Args:
-            audio_path (str): Path to the audio file.
-
-        Returns:
-            float: Speech continuity score as a percentage.
-        """
-        audio = AudioSegment.from_file(audio_path).set_frame_rate(16000).set_channels(1).set_sample_width(2)
-        tensor = torch.tensor(np.array(audio.get_array_of_samples()).astype(np.float32) / 32767.0)
-
-        # Use dependencies injected via __init__
-        speech_timestamps = self.get_speech_timestamps(tensor, self.vad_model, sampling_rate=16000)
-
-        speech_duration = sum(ts['end'] - ts['start'] for ts in speech_timestamps)
-        return round(speech_duration / len(tensor) * 100, 2)
-
     def analyze(self, input_data: AnalysisInput) -> dict:
         """Analyze audio data for energy and continuity.
 
@@ -78,9 +60,7 @@ class AudioAnalysis(IAnalysisModel):
             raise ValueError("AudioAnalysis requires input_data.audio_path")
 
         energy_stats = self._calculate_speech_energy(input_data.audio_path)
-        continuity_score = self._speech_continuity(input_data.audio_path)
 
         return {
             "energy_stats": energy_stats,
-            "continuity_score": continuity_score
         }
