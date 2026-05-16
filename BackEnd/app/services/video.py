@@ -7,6 +7,7 @@ from .video_standardize import standardize_video
 from ..db import get_db_connection
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
+import language_tool_python
 import uuid
 import os
 import shutil
@@ -67,20 +68,17 @@ def _insert_scores(video_id: int, scores: Scores):
     try:
        # Using cur.execute with the CALL keyword
         query = """
-        CALL insert_video_scores(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        CALL insert_video_scores(%s, %s, %s, %s, %s, %s, %s, %s);
         """
         cur.execute(query, (
-        video_id,
-        scores.speech_clarity,
-        scores.speech_fluency,
-        scores.speech_confidence,
-        scores.speech_expressiveness,
-        scores.speech_engagement,
-        scores.facial_confidence,
-        scores.facial_approachability,
-        scores.facial_engagement,
-        scores.video_professionalism,
-        scores.total_score
+            video_id,
+            scores.fillers_score,
+            scores.pause_rate_score,
+            scores.emotion_score,
+            scores.energy_score,
+            scores.eye_contact_score,
+            scores.grammar_score,
+            scores.total_score
         ))
 
         # Crucial: Don't forget to commit if you aren't using an autocommit connection
@@ -94,22 +92,88 @@ def _insert_scores(video_id: int, scores: Scores):
         conn.close()
 
 
-def scoring(facial_results: dict, audio_results: dict, text_results: dict, weights: MetricWeights) -> Scores:
-    # DISCUSSION NOTE: Scoring computation logic needs to be finalized in next meeting
-    return Scores(
-        speech_clarity=0.0,
-        speech_fluency=0.0,
-        speech_confidence=0.0,
-        speech_expressiveness=0.0,
-        speech_engagement=0.0,
-        facial_confidence=0.0,
-        facial_approachability=0.0,
-        facial_engagement=0.0,
-        video_professionalism=0.0,
-        total_score=0.0,
-        video_id=0
-    )
+def scoring(facial_results: dict, audio_results: dict, text_results: dict, weights: MetricWeights, video_id: int) -> Scores:
+    """Compute the final Scores object from analysis results and user weights.
 
+    All returned scores are normalized to the range 0.0 - 1.0 to match schema expectations. The total_score is a weighted average of the individual metrics, also normalized to 0.0 - 1.0.
+    """
+    # Text-based metrics
+    total_words = text_results.get("total_words", 0) or 0
+    filler_count = text_results.get("filler_count", 0) or 0
+    # filler rate in percent
+    filler_rate_pct = (filler_count / total_words) * 100 if total_words > 0 else 0.0
+    # fewer fillers => higher score (1.0 is best, 0.0 is worst)
+    fillers_score = max(0.0, 1.0 - (filler_rate_pct / 100.0))
+
+    # Pause / rate-of-stop: text_results should provide a pause quality percent (0-100)
+    pause_rate_pct = text_results.get("pause_rate", 0.0) or 0.0
+    pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0), 1.0)
+
+    # Grammar: text_results returns grammar_score already normalized to 0.0 - 1.0
+    grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
+
+    # Facial emotions: Averages DeepFace from facial_results["face_emotions"]
+    emotions = facial_results.get("face_emotions", {}) or {}
+    # normalize missing keys to 0
+    happy = float(emotions.get("happy", 0.0))
+    neutral = float(emotions.get("neutral", 0.0))
+    surprise = float(emotions.get("surprise", 0.0))
+    angry = float(emotions.get("angry", 0.0))
+    disgust = float(emotions.get("disgust", 0.0))
+    fear = float(emotions.get("fear", 0.0))
+    sad = float(emotions.get("sad", 0.0))
+
+    # the emotion score is a simple weighted combination of positive vs negative emotions, normalized to 0..1
+    positive = happy + neutral + 0.5 * surprise
+    negative = angry + disgust + fear + sad
+    raw_emotion_score = positive - negative
+
+    # ensure emotion score is between 0 and 100 before normalizing to 0..1
+    emotion_pct = max(0.0, min(raw_emotion_score, 100.0))
+    emotion_score = emotion_pct / 100.0
+
+    # Eye contact: facial_results provides a 0..1 score from the analyzer
+    eye_contact_raw = facial_results.get("eye_contact_score", 0.0) or 0.0
+    eye_contact_score = min(max(float(eye_contact_raw), 0.0), 1.0)
+
+    # Energy: use average / max to compute relative energy percentage
+    energy_stats = audio_results.get("energy_stats", {}) or {}
+    avg_energy = float(energy_stats.get("average_energy", 0.0) or 0.0)
+    max_energy = float(energy_stats.get("max_energy", 0.0) or 0.0)
+    if max_energy > 0:
+        energy_pct = (avg_energy / max_energy) * 100.0
+    else:
+        energy_pct = 0.0
+    energy_score = min(max(energy_pct / 100.0, 0.0), 1.0)
+
+    # Compute weighted total_score (weights expected 0..1)
+    try:
+        total_score = (
+            fillers_score * float(weights.fillers_weight)
+            + pause_rate_score * float(weights.pause_rate_weight)
+            + emotion_score * float(weights.emotion_weight)
+            + energy_score * float(weights.energy_weight)
+            + eye_contact_score * float(weights.eye_contact_weight)
+            + grammar_score * float(weights.grammar_weight)
+        )
+    except Exception:
+        # If weights are missing or invalid, back to equal weighting
+        components = [fillers_score, pause_rate_score, emotion_score, energy_score, eye_contact_score, grammar_score]
+        total_score = sum(components) / len(components) if components else 0.0
+
+    # Clamp final total to 0..1
+    total_score = min(max(float(total_score), 0.0), 1.0)
+
+    return Scores(
+        fillers_score=round(float(fillers_score), 4),
+        pause_rate_score=round(float(pause_rate_score), 4),
+        emotion_score=round(float(emotion_score), 4),
+        energy_score=round(float(energy_score), 4),
+        eye_contact_score=round(float(eye_contact_score), 4),
+        grammar_score=round(float(grammar_score), 4),
+        total_score=round(float(total_score), 4),
+        video_id=video_id
+    )
 
 def process_video(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
     if video_path is None:
@@ -148,7 +212,6 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
         # Load Grammar Tool for text analysis (handle grammar_mistakes dependencies)
         grammar_tool = None
         try:
-            import language_tool_python
             grammar_tool = language_tool_python.LanguageTool('en-US')
         except ImportError:
             print("Warning: language-tool-python not installed. Grammar analysis will be skipped.")
@@ -177,7 +240,7 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
         facial_results = facial_model.analyze(analysis_input)
         audio_results = audio_model.analyze(analysis_input)
 
-        scores = scoring(facial_results, audio_results, text_results, weights)
+        scores = scoring(facial_results, audio_results, text_results, weights, video_id=video_id)
         return scores
 
     except Exception as e:
@@ -185,15 +248,12 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
         # Return default scores to prevent crash
         return Scores(
             video_id=video_id,
-            speech_clarity=0.0,
-            speech_fluency=0.0,
-            speech_confidence=0.0,
-            speech_expressiveness=0.0,
-            speech_engagement=0.0,
-            facial_confidence=0.0,
-            facial_approachability=0.0,
-            facial_engagement=0.0,
-            video_professionalism=0.0,
+            fillers_score=0.0,
+            pause_rate_score=0.0,
+            emotion_score=0.0,
+            energy_score=0.0,
+            eye_contact_score=0.0,
+            grammar_score=0.0,
             total_score=0.0,
         )
     finally:

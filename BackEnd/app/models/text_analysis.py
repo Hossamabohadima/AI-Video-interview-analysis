@@ -54,24 +54,47 @@ class TextAnalysis(IAnalysisModel):
         return words_only, full_text
 
 
-
-    def _pause_rate(self, words):
+    def _pause_quality_score(self, words, min_threshold=0.25, ideal_min=0.4, ideal_max=0.8):
         """
-        Calculate pause rate as the average duration of pauses per second of speech.
+        Calculate the percentage of pauses that fall within the ideal natural range (around 0.6s).
+        // ratio according to https://pmc.ncbi.nlm.nih.gov/articles/PMC8874014/
         
         Args:
             words (list): List of word dictionaries with 'start' and 'end' timestamps.
+            min_threshold (float): Minimum gap to be considered a pause (ignores phonetic stops).
+            ideal_min (float): Lower bound of a natural-sounding pause.
+            ideal_max (float): Upper bound of a natural-sounding pause.
         
         Returns:
-            float: Pause rate in seconds of pause per second of speech.
+            float: Percentage of pauses that are considered "ideal" (0 to 100).
         """
-        duration = words[-1]['end'] - words[0]['start']
-        pauses = []
+        if not words or len(words) < 2:
+            return 0.0
+            
+        real_pauses = []
+        ideal_pauses = []
+        
         for i in range(len(words)-1):
             gap = words[i+1]['start'] - words[i]['end']
-            if gap > 1.0:  
-                pauses.append(gap)
-        return sum(pauses) / duration if pauses else 0
+            
+            # 2. Use the DETECTOR (0.25s) to filter out mechanical mouth movements
+            if gap > min_threshold:  
+                real_pauses.append(gap)
+                
+                # 3. Use the GRADER zone (0.4s to 0.8s, centered on 0.6s) to evaluate quality
+                if ideal_min <= gap <= ideal_max:
+                    ideal_pauses.append(gap)
+                    
+        # If they never paused, they get a 0 score for natural pacing
+        if not real_pauses:
+            return 0.0
+            
+        # 4. Calculate the score: what percentage of their pauses were "perfect"?
+        quality_score = (len(ideal_pauses) / len(real_pauses)) * 100
+        
+        return round(quality_score, 2)
+
+ 
 
     def _count_fillers(self, words, fillers=["um", "uh", "like", "you know", "ah", "ahh", "oh", "hmm", "er", "mm", "mmm", "uhm", "huh", "eh", "uhhh", "so", "actually", "basically", "right", "well", "you see", "I mean", "kind of", "sort of"]):
         """
@@ -120,7 +143,7 @@ class TextAnalysis(IAnalysisModel):
         num_errors = len(mistakes)
         word_count = max(len(full_text.split()), 1)
 
-        grammar_score = max(0, 100 - (num_errors / word_count * 100))
+        grammar_score = max(0.0, 1.0 - (num_errors / word_count))
         
         return mistakes, grammar_score, num_errors, word_count
 
