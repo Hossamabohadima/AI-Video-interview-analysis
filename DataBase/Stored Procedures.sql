@@ -5,16 +5,13 @@ RETURNS TABLE(
     duration DECIMAL,
     status videoStatus, 
     videoname varchar(50),
-    SpeechClarity DECIMAL,
-    SpeechFluency DECIMAL,
-    SpeechConfidence DECIMAL,
-    SpeechExpressiveness DECIMAL,
-    SpeechEngagement DECIMAL,
-    FacialConfidence DECIMAL,
-    FacialApproachability DECIMAL,
-    FacialEngagement DECIMAL,
-    VideoProfessionalism DECIMAL,
-    totalScore DECIMAL
+    fillers_score DECIMAL,
+    pause_rate_score DECIMAL,
+    emotion_score DECIMAL,
+    energy_score DECIMAL,
+    eye_contact_score DECIMAL,
+    grammar_score DECIMAL,
+    total_score DECIMAL
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -24,16 +21,13 @@ BEGIN
         v.duration::DECIMAL,
         v.status,
         v.videoname,
-        vs.speechclarity::DECIMAL,
-        vs.speechfluency::DECIMAL,
-        vs.speechconfidence::DECIMAL,
-        vs.speechexpressiveness::DECIMAL,
-        vs.speechengagement::DECIMAL,
-        vs.facialconfidence::DECIMAL,
-        vs.facialapproachability::DECIMAL,
-        vs.facialengagement::DECIMAL,
-        vs.videoprofessionalism::DECIMAL,
-        vs.totalscore::DECIMAL
+        vs.fillers_score::DECIMAL,
+        vs.pause_rate_score::DECIMAL,
+        vs.emotion_score::DECIMAL,
+        vs.energy_score::DECIMAL,
+        vs.eye_contact_score::DECIMAL,
+        vs.grammar_score::DECIMAL,
+        vs.total_score::DECIMAL
     FROM Video v
     LEFT JOIN videoScore vs ON v.videoid = vs.videoid
     WHERE v.userid = p_user_id;
@@ -43,31 +37,25 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION compare_reports_sp(v1 INT, v2 INT)
 RETURNS TABLE(
     res_videoid INT,
-    res_SpeechClarity DECIMAL,
-    res_SpeechFluency DECIMAL,
-    res_SpeechConfidence DECIMAL,
-    res_SpeechExpressiveness DECIMAL,
-    res_SpeechEngagement DECIMAL,
-    res_FacialConfidence DECIMAL,
-    res_FacialApproachability DECIMAL,
-    res_FacialEngagement DECIMAL,
-    res_VideoProfessionalism DECIMAL,
-    res_totalScore DECIMAL
+    res_fillers_score DECIMAL,
+    res_pause_rate_score DECIMAL,
+    res_emotion_score DECIMAL,
+    res_energy_score DECIMAL,
+    res_eye_contact_score DECIMAL,
+    res_grammar_score DECIMAL,
+    res_total_score DECIMAL
 ) AS $$
 BEGIN
     RETURN QUERY
     SELECT 
         vs.videoid,
-        vs.SpeechClarity::DECIMAL,
-        vs.SpeechFluency::DECIMAL,
-        vs.SpeechConfidence::DECIMAL,
-        vs.SpeechExpressiveness::DECIMAL,
-        vs.SpeechEngagement::DECIMAL,
-        vs.FacialConfidence::DECIMAL,
-        vs.FacialApproachability::DECIMAL,
-        vs.FacialEngagement::DECIMAL,
-        vs.VideoProfessionalism::DECIMAL,
-        vs.totalScore::DECIMAL
+        vs.fillers_score::DECIMAL,
+        vs.pause_rate_score::DECIMAL,
+        vs.emotion_score::DECIMAL,
+        vs.energy_score::DECIMAL,
+        vs.eye_contact_score::DECIMAL,
+        vs.grammar_score::DECIMAL,
+        vs.total_score::DECIMAL
     FROM videoScore vs
     WHERE vs.videoid = v1 OR vs.videoid = v2;
 END;
@@ -179,8 +167,6 @@ BEGIN
 END;
 $$;
 
-
-
 CREATE OR REPLACE FUNCTION login_user_sp(p_email TEXT, p_password TEXT)
 RETURNS TABLE(userid INT, name TEXT, role user_role, password TEXT) AS $$
 BEGIN
@@ -194,22 +180,19 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION get_video_scores(p_video_id INT)
 RETURNS TABLE(
-    speechClarity DECIMAL(5,2),
-    speechFluency DECIMAL(5,2),
-    speechConfidence DECIMAL(5,2),
-    speechExpressiveness DECIMAL(5,2),
-    speechEngagement DECIMAL(5,2),
-    facialConfidence DECIMAL(5,2),
-    facialApproachability DECIMAL(5,2),
-    facialEngagement DECIMAL(5,2),
-    videoProfessionalism DECIMAL(5,2),
-    totalScore DECIMAL(5,2)
+    fillers_score DECIMAL(5,2),
+    pause_rate_score DECIMAL(5,2),
+    emotion_score DECIMAL(5,2),
+    energy_score DECIMAL(5,2),
+    eye_contact_score DECIMAL(5,2),
+    grammar_score DECIMAL(5,2),
+    total_score DECIMAL(5,2)
 ) AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        SpeechClarity, SpeechFluency, SpeechConfidence, SpeechExpressiveness, SpeechEngagement,
-        FacialConfidence, FacialApproachability, FacialEngagement, VideoProfessionalism, totalScore
+        fillers_score, pause_rate_score, emotion_score, energy_score,
+        eye_contact_score, grammar_score, total_score
     FROM videoScore
     WHERE videoID = p_video_id;
 END;
@@ -218,26 +201,23 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE PROCEDURE insert_video_scores(
     p_video_id INTEGER,
-    p_speechClarity DECIMAL(5,2),
-    p_speechFluency DECIMAL(5,2),
-    p_speechConfidence DECIMAL(5,2),
-    p_speechExpressiveness DECIMAL(5,2),
-    p_speechEngagement DECIMAL(5,2),
-    p_facialConfidence DECIMAL(5,2),
-    p_facialApproachability DECIMAL(5,2),
-    p_facialEngagement DECIMAL(5,2),
-    p_videoProfessionalism DECIMAL(5,2),
-    p_totalScore DECIMAL(5,2)
+    p_fillers_score DECIMAL(5,2),
+    p_pause_rate_score DECIMAL(5,2),
+    p_emotion_score DECIMAL(5,2),
+    p_energy_score DECIMAL(5,2),
+    p_eye_contact_score DECIMAL(5,2),
+    p_grammar_score DECIMAL(5,2),
+    p_total_score DECIMAL(5,2)
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
     INSERT INTO videoScore (
-        videoID, SpeechClarity, SpeechFluency, SpeechConfidence, SpeechExpressiveness, SpeechEngagement,
-        FacialConfidence, FacialApproachability, FacialEngagement, VideoProfessionalism, totalScore
+        videoID, fillers_score, pause_rate_score, emotion_score, energy_score,
+        eye_contact_score, grammar_score, total_score
     ) VALUES (
-        p_video_id, p_speechClarity, p_speechFluency, p_speechConfidence, p_speechExpressiveness, p_speechEngagement,
-        p_facialConfidence, p_facialApproachability, p_facialEngagement, p_videoProfessionalism, p_totalScore
+        p_video_id, p_fillers_score, p_pause_rate_score, p_emotion_score, p_energy_score,
+        p_eye_contact_score, p_grammar_score, p_total_score
     );
 END;
 $$;
