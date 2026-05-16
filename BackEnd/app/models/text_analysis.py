@@ -143,7 +143,7 @@ class TextAnalysis(IAnalysisModel):
         num_errors = len(mistakes)
         word_count = max(len(full_text.split()), 1)
 
-        grammar_score = max(0, 100 - (num_errors / word_count * 100))
+        grammar_score = max(0.0, 1.0 - (num_errors / word_count))
         
         return mistakes, grammar_score, num_errors, word_count
 

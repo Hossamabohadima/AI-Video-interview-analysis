@@ -109,9 +109,8 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     pause_rate_pct = text_results.get("pause_rate", 0.0) or 0.0
     pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0), 1.0)
 
-    # Grammar: text_results returns grammar_score as 0-100 (100 is perfect)
-    grammar_pct = text_results.get("grammar_score", 100.0) or 100.0
-    grammar_score = min(max(grammar_pct / 100.0, 0.0), 1.0)
+    # Grammar: text_results returns grammar_score already normalized to 0.0 - 1.0
+    grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
     # Facial emotions: Averages DeepFace from facial_results["face_emotions"]
     emotions = facial_results.get("face_emotions", {}) or {}
