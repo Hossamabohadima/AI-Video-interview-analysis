@@ -1,0 +1,14 @@
+npm install
+
+then 
+
+npm run dev
+
+
+
+paths
+http://localhost:5173/sign-in
+http://localhost:5173/how-it-works
+http://localhost:5173/history
+http://localhost:5173/report
+http://localhost:5173/process-video
