@@ -1,8 +1,6 @@
 from .IAnalysisModel import IAnalysisModel, AnalysisInput
 from pyAudioAnalysis import audioBasicIO, ShortTermFeatures
 import numpy as np
-import torch
-from pydub import AudioSegment
 
 class AudioAnalysis(IAnalysisModel):
     def __init__(self):

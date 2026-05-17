@@ -1,10 +1,5 @@
 from pydoc import text
-
 from .IAnalysisModel import IAnalysisModel, AnalysisInput
-from nltk.corpus import stopwords
-from collections import Counter
-import nltk
-import re
 import language_tool_python
 
 class TextAnalysis(IAnalysisModel):
@@ -162,7 +157,7 @@ class TextAnalysis(IAnalysisModel):
 
         whisper_result = input_data.whisper_result
         words, full_text = self._extract_words_and_text(whisper_result)
-        pause_rate_val = self._pause_rate(words)
+        pause_rate_val = self._pause_quality_score(words)
         total_words, filler_count = self._count_fillers(words)
         grammar_mistakes, grammar_score, num_errors, word_count = self._grammar_mistakes(full_text)
  
