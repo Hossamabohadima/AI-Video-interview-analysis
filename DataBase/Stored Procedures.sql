@@ -338,10 +338,10 @@ RETURNS TABLE(
 BEGIN
     RETURN QUERY
     SELECT 
-        fillers_score, pause_rate_score, emotion_score, energy_score,
-        eye_contact_score, grammar_score, total_score
-    FROM videoScore
-    WHERE videoID = p_video_id;
+        vs.fillers_score, vs.pause_rate_score, vs.emotion_score, vs.energy_score,
+        vs.eye_contact_score, vs.grammar_score, vs.total_score
+    FROM videoScore vs
+    WHERE vs.videoID = p_video_id;
 END;
 $$ LANGUAGE plpgsql;
 

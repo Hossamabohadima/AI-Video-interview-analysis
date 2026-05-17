@@ -12,6 +12,8 @@ import uuid
 import os
 import shutil
 import json
+import decimal
+import psycopg2.extras
 import whisper
 import subprocess
 import mediapipe as mp
@@ -57,6 +59,54 @@ def _get_video_filename(video_id: int) -> str | None:
     finally:
         cur.close()
         conn.close()
+
+
+def _json_default(obj):
+    """Convert nonstandard numeric types to JSON serializable primitives."""
+    try:
+        return obj.tolist()
+    except Exception:
+        pass
+    try:
+        return float(obj)
+    except Exception:
+        pass
+    try:
+        return int(obj)
+    except Exception:
+        pass
+    try:
+        return str(obj)
+    except Exception:
+        pass
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+def _normalize_json_values(obj):
+    if isinstance(obj, dict):
+        return {k: _normalize_json_values(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_json_values(v) for v in obj]
+    if isinstance(obj, tuple):
+        return tuple(_normalize_json_values(v) for v in obj)
+    if obj is None or isinstance(obj, (str, bool, int, float)):
+        return obj
+    if hasattr(obj, "tolist"):
+        try:
+            return _normalize_json_values(obj.tolist())
+        except Exception:
+            pass
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="ignore")
+    try:
+        return float(obj)
+    except Exception:
+        pass
+    try:
+        return int(obj)
+    except Exception:
+        pass
+    return str(obj)
 
 
 def _insert_scores(video_id: int, scores: Scores, cur=None, conn=None):
@@ -124,15 +174,18 @@ def _insert_or_update_video_analysis(
         conn = get_db_connection()
         cur = conn.cursor()
     try:
-        query = "CALL insert_or_update_video_analysis(%s, %s, %s, %s, %s, %s, %s, %s);"
+        query = (
+            "CALL insert_or_update_video_analysis(%s::integer, %s::jsonb, %s::numeric, %s::jsonb, "
+            "%s::jsonb, %s::jsonb, %s::jsonb, %s::numeric);"
+        )
         cur.execute(query, (
             video_id,
-            json.dumps(fillers_word),
+            json.dumps(fillers_word, default=_json_default),
             rate_of_stop,
-            json.dumps(emotion_analysis),
-            json.dumps(energy_statistics),
-            json.dumps(eye_contact),
-            json.dumps(grammar_mistakes),
+            json.dumps(emotion_analysis, default=_json_default),
+            json.dumps(energy_statistics, default=_json_default),
+            json.dumps(eye_contact, default=_json_default),
+            json.dumps(grammar_mistakes, default=_json_default),
             total_score,
         ))
         if own_conn:
@@ -211,7 +264,8 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
             + eye_contact_score * float(weights.eye_contact_weight)
             + grammar_score * float(weights.grammar_weight)
         )
-    except Exception:
+    except Exception as e:
+        print(f"Error computing total score for video {video_id}: {e}")
         # If weights are missing or invalid, back to equal weighting
         components = [fillers_score, pause_rate_score, emotion_score, energy_score, eye_contact_score, grammar_score]
         total_score = sum(components) / len(components) if components else 0.0
@@ -309,6 +363,7 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
             _insert_scores(video_id, scores, cur=cur, conn=conn)
             conn.commit()
         except Exception:
+            print(f"Error inserting analysis results for video {video_id}")
             conn.rollback()
             raise
         finally:
@@ -431,7 +486,8 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
             "video_id": video_id,
             "file_name": unique_name,
             "duration": duration,
-            "status": "DONE"
+            "status": "DONE",
+            "scores": scores
         }
 
     except Exception as e:

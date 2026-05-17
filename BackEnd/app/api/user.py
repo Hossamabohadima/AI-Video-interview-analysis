@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
 from ..schemas.video import MetricWeights, VideoComparisonRequest
-from decimal import Decimal
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
@@ -121,32 +120,3 @@ async def upload_videos(
             )
 
     return {"uploaded_videos": results}
-
-
-@router.put("/weights-legacy", status_code=status.HTTP_200_OK, deprecated=True)
-async def update_weights_legacy(weights: dict, current_user: dict = Depends(get_current_user)):
-    """[DEPRECATED] Update metric weights. Use /metrics/weights instead."""
-    if not weights:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Weights cannot be empty"
-        )
-    
-    try:
-        success = await set_weights(current_user["user_id"], weights)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        return {"message": "Weights updated successfully"}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update weights"
-        )
