@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from typing import List
+from pydantic import BaseModel, Field, model_validator
 
 class Video(BaseModel):
     video_id: int = Field(..., gt=0)
@@ -16,6 +17,26 @@ class MetricWeights(BaseModel):
     eye_contact_weight: float = Field(..., ge=0, le=1)
     grammar_weight: float = Field(..., ge=0, le=1)
 
+    @model_validator(mode='after')
+    def weights_must_sum_to_one(self) -> 'MetricWeights':
+        # Sum the values directly from the model attributes
+        total = (
+            self.fillers_weight
+            + self.pause_rate_weight
+            + self.emotion_weight
+            + self.energy_weight
+            + self.eye_contact_weight
+            + self.grammar_weight
+        )
+        
+        # Use math.isclose or keep your current delta check
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError('Metric weights must sum to 1.0')
+            
+        # Crucial for Pydantic v2: always return self
+        return self
+class VideoComparisonRequest(BaseModel):
+    video_ids: List[int] = Field(..., min_items=2)
 class Scores(BaseModel):
     fillers_score : float = Field(..., ge=0, le=1)
     pause_rate_score : float = Field(..., ge=0, le=1)

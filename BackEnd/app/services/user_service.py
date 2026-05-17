@@ -1,8 +1,10 @@
+import json
 from fastapi import HTTPException
 from decimal import Decimal
 import psycopg2
 import psycopg2.extras
 from ..db import get_db_connection
+from ..schemas.video import MetricWeights
 
 async def get_reports(user_id: int):
     """Fetch all video reports for a user."""
@@ -20,24 +22,33 @@ async def get_reports(user_id: int):
         conn.close()
 
 
-async def compare_reports(v1: int, v2: int):
+async def compare_reports(video_ids: list[int], user_id: int):
+    if len(video_ids) < 2:
+        raise ValueError("At least two video IDs are required for comparison")
+
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    print("dfdff")
+    cur = conn.cursor()
+
     try:
-        cur.execute("SELECT * FROM compare_reports_sp(%s, %s)", (v1, v2))
-        data = cur.fetchall()
-        print(f"Raw comparison data: {data}")  # Debugging line
-        # Convert Decimal objects to floats for JSON compatibility
-        for row in data:
-            for key, value in row.items():
-                if isinstance(value, Decimal):
-                    row[key] = float(value)
-                    
-        return data
+        cur.execute(
+            "SELECT get_video_score_and_analysis(%s, %s)",
+            (video_ids, user_id)
+        )
+        result = cur.fetchone()[0]
+
+        if isinstance(result, str):
+            result = json.loads(result)
+
+        if not result or not result.get("scores"):
+            raise HTTPException(
+                status_code=404,
+                detail="No videos found for comparison"
+            )
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
-        # Check your console for the actual error message here
-        print(f"Database Error: {e}") 
+        print(f"Database Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to compare reports: {str(e)}")
     finally:
         cur.close()

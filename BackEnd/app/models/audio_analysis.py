@@ -5,7 +5,7 @@ import torch
 from pydub import AudioSegment
 
 class AudioAnalysis(IAnalysisModel):
-    def __init__(self, vad_model, get_speech_timestamps):
+    def __init__(self):
         """Initialize the AudioAnalysis model.
 
         Args:
@@ -13,8 +13,7 @@ class AudioAnalysis(IAnalysisModel):
             get_speech_timestamps: Function to get speech timestamps.
         """
         super().__init__("AudioAnalysis")
-        self.vad_model = vad_model
-        self.get_speech_timestamps = get_speech_timestamps
+
 
     def _calculate_speech_energy(self, audio_path: str) -> dict:
         """Calculate speech energy statistics from an audio file.
