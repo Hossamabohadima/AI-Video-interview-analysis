@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from schemas.video import Scores, MetricWeights
+from schemas.video import Scores
 from services.scores_service import get_video_scores
 from utils.dependencies import get_current_user
 

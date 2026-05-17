@@ -1,4 +1,4 @@
-from ..models.IAnalysisModel import IAnalysisModel, AnalysisInput
+from ..models.IAnalysisModel import AnalysisInput
 from ..schemas.video import MetricWeights, Scores
 from ..models.facial_analysis import FacialAnalysis
 from ..models.audio_analysis import AudioAnalysis
@@ -14,9 +14,7 @@ import shutil
 import json
 import whisper
 import subprocess
-import torch
 import mediapipe as mp
-import asyncio
 
 
 def _extract_audio_from_video(video_path: str) -> str:
@@ -61,10 +59,12 @@ def _get_video_filename(video_id: int) -> str | None:
         conn.close()
 
 
-def _insert_scores(video_id: int, scores: Scores):
+def _insert_scores(video_id: int, scores: Scores, cur=None, conn=None):
     """Insert video scores using stored procedure."""
-    conn = get_db_connection()
-    cur = conn.cursor()
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db_connection()
+        cur = conn.cursor()
     try:
        # Using cur.execute with the CALL keyword
         query = """
@@ -81,15 +81,70 @@ def _insert_scores(video_id: int, scores: Scores):
             scores.total_score
         ))
 
-        # Crucial: Don't forget to commit if you aren't using an autocommit connection
-        # conn.commit()
+        if own_conn:
+            conn.commit()
+    except Exception as e:
+        if own_conn:
+            conn.rollback()
+        raise ValueError(f"Failed to insert scores: {str(e)}")
+    finally:
+        if own_conn:
+            cur.close()
+            conn.close()
+
+
+def _update_video_status(video_id: int, status: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE Video SET status = %s WHERE videoID = %s", (status, video_id))
         conn.commit()
     except Exception as e:
         conn.rollback()
-        raise ValueError(f"Failed to insert scores: {str(e)}")
+        raise ValueError(f"Failed to update video status: {str(e)}")
     finally:
         cur.close()
         conn.close()
+
+
+def _insert_or_update_video_analysis(
+    video_id: int,
+    fillers_word: dict | list,
+    rate_of_stop: float,
+    emotion_analysis: dict,
+    energy_statistics: dict,
+    eye_contact: dict,
+    grammar_mistakes: dict | list,
+    total_score: float,
+    cur=None,
+    conn=None,
+):
+    own_conn = conn is None
+    if own_conn:
+        conn = get_db_connection()
+        cur = conn.cursor()
+    try:
+        query = "CALL insert_or_update_video_analysis(%s, %s, %s, %s, %s, %s, %s, %s);"
+        cur.execute(query, (
+            video_id,
+            json.dumps(fillers_word),
+            rate_of_stop,
+            json.dumps(emotion_analysis),
+            json.dumps(energy_statistics),
+            json.dumps(eye_contact),
+            json.dumps(grammar_mistakes),
+            total_score,
+        ))
+        if own_conn:
+            conn.commit()
+    except Exception as e:
+        if own_conn:
+            conn.rollback()
+        raise ValueError(f"Failed to insert video analysis: {str(e)}")
+    finally:
+        if own_conn:
+            cur.close()
+            conn.close()
 
 
 def scoring(facial_results: dict, audio_results: dict, text_results: dict, weights: MetricWeights, video_id: int) -> Scores:
@@ -234,8 +289,32 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
         text_results = text_model.analyze(analysis_input)
         facial_results = facial_model.analyze(analysis_input)
         audio_results = audio_model.analyze(analysis_input)
-
+        
         scores = scoring(facial_results, audio_results, text_results, weights, video_id=video_id)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            _insert_or_update_video_analysis(
+                video_id=video_id,
+                fillers_word=text_results.get("fillers_word", {}),
+                rate_of_stop=float(text_results.get("pause_rate", 0.0) or 0.0),
+                emotion_analysis=facial_results.get("face_emotions", {}),
+                energy_statistics=audio_results.get("energy_stats", {}),
+                eye_contact={"score": facial_results.get("eye_contact_score", 0.0)},
+                grammar_mistakes=text_results.get("grammar_mistakes", []),
+                total_score=float(scores.total_score),
+                cur=cur,
+                conn=conn,
+            )
+            _insert_scores(video_id, scores, cur=cur, conn=conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+            conn.close()
+
         return scores
 
     except Exception as e:
@@ -272,6 +351,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
     output_path = os.path.join(folder, unique_name)
 
     duration = 0.0
+    video_id = None
 
     try:
         with open(output_path, "wb") as f:
@@ -342,15 +422,16 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
         )
         
         if scores is None:
+            _update_video_status(video_id, "FAILED")
             raise RuntimeError(f"Failed to process video {video_id}")
-        
-        _insert_scores(video_id, scores)
+
+        _update_video_status(video_id, "DONE")
         
         return {
             "video_id": video_id,
             "file_name": unique_name,
             "duration": duration,
-            "status": "PROCESSED"
+            "status": "DONE"
         }
 
     except Exception as e:
@@ -359,18 +440,12 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
                 os.remove(output_path)
             except OSError:
                 pass
+
+        if video_id is not None:
+            try:
+                _update_video_status(video_id, "FAILED")
+            except Exception:
+                pass
+
         raise
 
-
-async def process_video(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
-    """Asynchronously process video using thread pool for CPU-intensive operations."""
-    if video_path is None:
-        file_name = _get_video_filename(video_id)
-        if not file_name:
-            raise ValueError(f"No video found for video_id={video_id}")
-        video_path = os.path.join("videos", file_name)
-
-    if weights is None:
-        weights = MetricWeights()
-
-    return await run_in_threadpool(_process_video_sync, video_id, weights, video_path)

@@ -369,3 +369,46 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE insert_or_update_video_analysis(
+    p_video_id INTEGER,
+    p_fillers_word JSONB,
+    p_rate_of_stop DECIMAL(10,4),
+    p_emotion_analysis JSONB,
+    p_energy_statistics JSONB,
+    p_eye_contact JSONB,
+    p_grammar_mistakes JSONB,
+    p_total_score DECIMAL(10,4)
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO VideoAnalysis (
+        videoID,
+        fillers_Word,
+        rate_Of_Stop,
+        emotion_analysis,
+        energy_Statistics,
+        eye_Contact,
+        grammar_Mistakes,
+        total_Score
+    ) VALUES (
+        p_video_id,
+        p_fillers_word,
+        p_rate_of_stop,
+        p_emotion_analysis,
+        p_energy_statistics,
+        p_eye_contact,
+        p_grammar_mistakes,
+        p_total_score
+    )
+    ON CONFLICT (videoID) DO UPDATE SET
+        fillers_Word = EXCLUDED.fillers_Word,
+        rate_Of_Stop = EXCLUDED.rate_Of_Stop,
+        emotion_analysis = EXCLUDED.emotion_analysis,
+        energy_Statistics = EXCLUDED.energy_Statistics,
+        eye_Contact = EXCLUDED.eye_Contact,
+        grammar_Mistakes = EXCLUDED.grammar_Mistakes,
+        total_Score = EXCLUDED.total_Score;
+END;
+$$;
+
