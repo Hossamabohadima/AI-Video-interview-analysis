@@ -6,6 +6,8 @@ __pycache__/
 # IDE and environment files
 .idea/
 .vscode/
+**/.idea/**
+**/.vscode/**
 
 # Generated data and logs
 *.log
