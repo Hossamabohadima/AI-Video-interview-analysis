@@ -1,0 +1,19 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and environment files
+.idea/
+.vscode/
+
+# Generated data and logs
+*.log
+*.sqlite3
+*.db
+
+# Ignore audio and video folders anywhere in the repo
+audio/
+videos/
+**/audio/**
+**/videos/**

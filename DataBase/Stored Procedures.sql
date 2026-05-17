@@ -61,6 +61,73 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION get_video_score_and_analysis(
+    p_video_ids INT[],
+    p_user_id INT
+)
+RETURNS JSON AS $$
+DECLARE
+    score_list JSONB := '[]'::JSONB;
+    analysis_list JSONB := '[]'::JSONB;
+    rec RECORD;
+BEGIN
+    FOR rec IN
+        SELECT v.videoid,
+               vs.fillers_score,
+               vs.pause_rate_score,
+               vs.emotion_score,
+               vs.energy_score,
+               vs.eye_contact_score,
+               vs.grammar_score,
+               vs.total_score,
+               va.fillers_word,
+               va.rate_of_stop,
+               va.emotion_analysis,
+               va.energy_statistics,
+               va.eye_contact,
+               va.grammar_mistakes,
+               va.total_score AS analysis_total_score
+        FROM Video v
+        LEFT JOIN videoScore vs ON vs.videoid = v.videoid
+        LEFT JOIN VideoAnalysis va ON va.videoid = v.videoid
+        WHERE v.userid = p_user_id
+          AND v.videoid = ANY(p_video_ids)
+        ORDER BY array_position(p_video_ids, v.videoid)
+    LOOP
+        score_list := score_list || jsonb_build_array(
+            jsonb_build_object(
+                'videoID', rec.videoid,
+                'fillers_score', rec.fillers_score,
+                'pause_rate_score', rec.pause_rate_score,
+                'emotion_score', rec.emotion_score,
+                'energy_score', rec.energy_score,
+                'eye_contact_score', rec.eye_contact_score,
+                'grammar_score', rec.grammar_score,
+                'total_score', rec.total_score
+            )
+        );
+
+        analysis_list := analysis_list || jsonb_build_array(
+            jsonb_build_object(
+                'videoID', rec.videoid,
+                'fillers_Word', rec.fillers_word,
+                'rate_Of_Stop', rec.rate_of_stop,
+                'emotion_analysis', rec.emotion_analysis,
+                'energy_Statistics', rec.energy_statistics,
+                'eye_Contact', rec.eye_contact,
+                'grammar_Mistakes', rec.grammar_mistakes,
+                'total_Score', rec.analysis_total_score
+            )
+        );
+    END LOOP;
+
+    RETURN json_build_object(
+        'scores', score_list,
+        'analysis', analysis_list
+    );
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION set_threshold_score(
     p_user_id INT,
     p_score FLOAT
@@ -83,30 +150,28 @@ $$;
 
 CREATE OR REPLACE FUNCTION set_weights_fn(
     p_user_id INT,
-    p_SpeechClarity DECIMAL,
-    p_SpeechFluency DECIMAL,
-    p_SpeechConfidence DECIMAL,
-    p_SpeechExpressiveness DECIMAL,
-    p_SpeechEngagement DECIMAL,
-    p_FacialConfidence DECIMAL,
-    p_FacialApproachability DECIMAL,
-    p_FacialEngagement DECIMAL,
-    p_VideoProfessionalism DECIMAL
+    p_fillers_weight DECIMAL(5,4),
+    p_pause_rate_weight DECIMAL(5,4),
+    p_emotion_weight DECIMAL(5,4),
+    p_energy_weight DECIMAL(5,4),
+    p_eye_contact_weight DECIMAL(5,4),
+    p_grammar_weight DECIMAL(5,4)
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF p_fillers_weight + p_pause_rate_weight + p_emotion_weight + p_energy_weight + p_eye_contact_weight + p_grammar_weight <> 1.0 THEN
+        RETURN FALSE;
+    END IF;
+
     UPDATE MetricWeight SET
-        SpeechClarity = p_SpeechClarity,
-        SpeechFluency = p_SpeechFluency,
-        SpeechConfidence = p_SpeechConfidence,
-        SpeechExpressiveness = p_SpeechExpressiveness,
-        SpeechEngagement = p_SpeechEngagement,
-        FacialConfidence = p_FacialConfidence,
-        FacialApproachability = p_FacialApproachability,
-        FacialEngagement = p_FacialEngagement,
-        VideoProfessionalism = p_VideoProfessionalism
+        fillers_weight = p_fillers_weight,
+        pause_rate_weight = p_pause_rate_weight,
+        emotion_weight = p_emotion_weight,
+        energy_weight = p_energy_weight,
+        eye_contact_weight = p_eye_contact_weight,
+        grammar_weight = p_grammar_weight
     WHERE userID = p_user_id;
 
     IF NOT FOUND THEN
@@ -116,6 +181,96 @@ BEGIN
     RETURN TRUE;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION insert_metric_weight(
+    p_user_id INT,
+    p_fillers_weight DECIMAL(5,4),
+    p_pause_rate_weight DECIMAL(5,4),
+    p_emotion_weight DECIMAL(5,4),
+    p_energy_weight DECIMAL(5,4),
+    p_eye_contact_weight DECIMAL(5,4),
+    p_grammar_weight DECIMAL(5,4)
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_fillers_weight + p_pause_rate_weight + p_emotion_weight + p_energy_weight + p_eye_contact_weight + p_grammar_weight <> 1.0 THEN
+        RETURN FALSE;
+    END IF;
+
+    INSERT INTO MetricWeight (
+        userID,
+        fillers_weight,
+        pause_rate_weight,
+        emotion_weight,
+        energy_weight,
+        eye_contact_weight,
+        grammar_weight
+    ) VALUES (
+        p_user_id,
+        p_fillers_weight,
+        p_pause_rate_weight,
+        p_emotion_weight,
+        p_energy_weight,
+        p_eye_contact_weight,
+        p_grammar_weight
+    );
+
+    RETURN TRUE;
+EXCEPTION WHEN unique_violation THEN
+    RETURN FALSE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION insert_or_update_video_metric_weight(
+    p_video_id INT,
+    p_fillers_weight DECIMAL(5,4),
+    p_pause_rate_weight DECIMAL(5,4),
+    p_emotion_weight DECIMAL(5,4),
+    p_energy_weight DECIMAL(5,4),
+    p_eye_contact_weight DECIMAL(5,4),
+    p_grammar_weight DECIMAL(5,4)
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_fillers_weight + p_pause_rate_weight + p_emotion_weight + p_energy_weight + p_eye_contact_weight + p_grammar_weight <> 1.0 THEN
+        RETURN FALSE;
+    END IF;
+
+    INSERT INTO VideoMetricWeight (
+        videoID,
+        fillers_weight,
+        pause_rate_weight,
+        emotion_weight,
+        energy_weight,
+        eye_contact_weight,
+        grammar_weight
+    ) VALUES (
+        p_video_id,
+        p_fillers_weight,
+        p_pause_rate_weight,
+        p_emotion_weight,
+        p_energy_weight,
+        p_eye_contact_weight,
+        p_grammar_weight
+    )
+    ON CONFLICT (videoID) DO UPDATE SET
+        fillers_weight = EXCLUDED.fillers_weight,
+        pause_rate_weight = EXCLUDED.pause_rate_weight,
+        emotion_weight = EXCLUDED.emotion_weight,
+        energy_weight = EXCLUDED.energy_weight,
+        eye_contact_weight = EXCLUDED.eye_contact_weight,
+        grammar_weight = EXCLUDED.grammar_weight;
+
+    RETURN TRUE;
+EXCEPTION WHEN foreign_key_violation OR check_violation OR unique_violation THEN
+    RETURN FALSE;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION add_video(
     p_video_name VARCHAR,
     p_user_id INT,
@@ -156,14 +311,6 @@ BEGIN
     INSERT INTO Users (name, email, password, phoneNumber, role)
     VALUES (p_name, p_email, p_password, p_phone, p_role)
     RETURNING userid INTO new_userid;
-
-    -- 2. Initialize Threshold
-    INSERT INTO Threshold (userID, thresholdValue)
-    VALUES (new_userid, p_initial_threshold);
-
-    -- 3. Initialize MetricWeight with default 1.0 (or 0.0)
-    INSERT INTO MetricWeight (userID, SpeechClarity, SpeechFluency, SpeechConfidence)
-    VALUES (new_userid, 0, 1.0, 0); 
 END;
 $$;
 
@@ -221,3 +368,4 @@ BEGIN
     );
 END;
 $$;
+

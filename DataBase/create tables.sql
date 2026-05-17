@@ -19,25 +19,7 @@ CREATE TABLE Threshold (
     thresholdValue DECIMAL(5,2) NOT NULL
 );
 
--- 4. Create MetricWeight table
-CREATE TABLE MetricWeight (
-    userID INT PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
-    fillers_weight DECIMAL(5,4) DEFAULT 0,
-    pause_rate_weight DECIMAL(5,4) DEFAULT 0,
-    emotion_weight DECIMAL(5,4) DEFAULT 0,
-    energy_weight DECIMAL(5,4) DEFAULT 0,
-    eye_contact_weight DECIMAL(5,4) DEFAULT 0,
-    grammar_weight DECIMAL(5,4) DEFAULT 0,
 
-    CONSTRAINT metric_score_limit CHECK (
-        fillers_weight +
-        pause_rate_weight +
-        emotion_weight +
-        energy_weight +
-        eye_contact_weight +
-        grammar_weight = 1.0
-    )
-);
 
 -- 5. Create Video table
 CREATE TABLE Video (
@@ -49,7 +31,26 @@ CREATE TABLE Video (
     status videoStatus NOT NULL 
 );
 
--- 6. Create videoScore table
+-- 6. Create VideoMetricWeight table for per-video weight storage
+CREATE TABLE VideoMetricWeight (
+    videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
+    fillers_weight DECIMAL(5,4) NOT NULL,
+    pause_rate_weight DECIMAL(5,4) NOT NULL,
+    emotion_weight DECIMAL(5,4) NOT NULL,
+    energy_weight DECIMAL(5,4) NOT NULL,
+    eye_contact_weight DECIMAL(5,4) NOT NULL,
+    grammar_weight DECIMAL(5,4) NOT NULL,
+    CONSTRAINT video_metric_weight_sum CHECK (
+        fillers_weight +
+        pause_rate_weight +
+        emotion_weight +
+        energy_weight +
+        eye_contact_weight +
+        grammar_weight = 1.0
+    )
+);
+
+-- 7. Create videoScore table
 CREATE TABLE videoScore (
     videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
     fillers_score DECIMAL(5,2) DEFAULT 0,

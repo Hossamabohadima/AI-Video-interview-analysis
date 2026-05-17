@@ -175,7 +175,7 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         video_id=video_id
     )
 
-def process_video(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
+def _process_video_sync(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
     if video_path is None:
         file_name = _get_video_filename(video_id)
         if not file_name:
@@ -191,11 +191,6 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
     audio_path = None
     try:
         # 1. Load dependencies for model initialization
-        # Load Silero VAD model and utilities
-        vad_model = torch.jit.load('../AI/silero_vad.task')
-        _, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
-        get_speech_timestamps, _, _, _, _ = utils
-
         # Load Face Landmarker configuration
         model_path = '../AI/face_landmarker.task'
         BaseOptions = mp.tasks.BaseOptions
@@ -225,7 +220,7 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
 
         # 3. Instantiate models with injected dependencies
         facial_model = FacialAnalysis(face_options=face_options)
-        audio_model = AudioAnalysis(vad_model=vad_model, get_speech_timestamps=get_speech_timestamps)
+        audio_model = AudioAnalysis()
         text_model = TextAnalysis(grammar_tool=grammar_tool)
 
         # 4. Create unified input object
@@ -264,7 +259,7 @@ def process_video(video_id: int, weights: MetricWeights | None = None, video_pat
                 pass
 
 
-async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str):
+async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str, weights: MetricWeights | None = None):
     """Handle video upload, validation, and async processing."""
     folder = "videos"
     os.makedirs(folder, exist_ok=True)
@@ -296,11 +291,28 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str)
         )
 
         rec = cur.fetchone()[0]
+        video_id = rec["video_id"]
+
+        if weights is not None:
+            cur.execute(
+                "SELECT insert_or_update_video_metric_weight(%s, %s, %s, %s, %s, %s, %s)",
+                (
+                    video_id,
+                    weights.fillers_weight,
+                    weights.pause_rate_weight,
+                    weights.emotion_weight,
+                    weights.energy_weight,
+                    weights.eye_contact_weight,
+                    weights.grammar_weight,
+                )
+            )
+            insert_result = cur.fetchone()[0]
+            if not insert_result:
+                raise ValueError("Failed to persist metric weights for video")
+
         conn.commit()
         cur.close()
         conn.close()
-
-        video_id = rec["video_id"]
 
         # Run video standardization in thread pool (CPU-intensive)
         unique_standardized_path = os.path.join("videos", f"standardized_{uuid.uuid4()}.mp4")
@@ -323,7 +335,10 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str)
 
         # Run video processing in thread pool (CPU-intensive)
         scores = await run_in_threadpool(
-            _process_video_sync, video_id, MetricWeights(), output_path
+            _process_video_sync,
+            video_id,
+            weights or MetricWeights(),
+            output_path
         )
         
         if scores is None:
