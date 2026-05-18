@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
+from typing import List, Optional
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends, Body
 from ..schemas.Threshold import Threshold
 from decimal import Decimal
 from ..services.user_service import (
@@ -32,14 +33,40 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/reports/compare", status_code=status.HTTP_200_OK)
-async def compare_user_reports(video1: int, video2: int, current_user: dict = Depends(get_current_user)):
+async def compare_user_reports(
+    video_ids: Optional[List[int]] = Body(default=None, embed=True),
+    video1: Optional[int] = None,
+    video2: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
     try:
-        result = await compare_reports(video1, video2)
-        if len(result) < 2: # Changed from <= 1 for clarity
+        if video_ids is None:
+            if video1 is None or video2 is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Provide at least two video IDs for comparison"
+                )
+            video_ids = [video1, video2]
+
+        if len(video_ids) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide at least two video IDs for comparison"
+            )
+
+        result = await compare_reports(video_ids)
+        found_ids = {row["res_videoid"] for row in result}
+        requested_ids = list(dict.fromkeys(video_ids))
+        missing_ids = [vid for vid in requested_ids if vid not in found_ids]
+        if missing_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="At least one video not found for comparison"
+                detail={
+                    "message": "Some videos not found for comparison",
+                    "missing_video_ids": missing_ids
+                }
             )
+
         return {"comparison": result}
     except HTTPException as e:
         # Re-raise HTTPExceptions so we see the actual 404 or 500 detail

@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import HTTPException
 from decimal import Decimal
 import psycopg2
@@ -20,12 +21,13 @@ async def get_reports(user_id: int):
         conn.close()
 
 
-async def compare_reports(v1: int, v2: int):
+async def compare_reports(video_ids: List[int]):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    print("dfdff")
     try:
-        cur.execute("SELECT * FROM compare_reports_sp(%s, %s)", (v1, v2))
+        if not video_ids:
+            return []
+        cur.execute("SELECT * FROM compare_reports_sp(%s)", (video_ids,))
         data = cur.fetchall()
         print(f"Raw comparison data: {data}")  # Debugging line
         # Convert Decimal objects to floats for JSON compatibility
