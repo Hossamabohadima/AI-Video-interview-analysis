@@ -20,16 +20,13 @@ async def get_video_scores(video_id: int) -> Scores:
             raise ValueError(f"No scores found for video {video_id}")
         
         return Scores(
-            speech_clarity=float(row["speechClarity"]),
-            speech_fluency=float(row["speechFluency"]),
-            speech_confidence=float(row["speechConfidence"]),
-            speech_expressiveness=float(row["speechExpressiveness"]),
-            speech_engagement=float(row["speechEngagement"]),
-            facial_confidence=float(row["facialConfidence"]),
-            facial_approachability=float(row["facialApproachability"]),
-            facial_engagement=float(row["facialEngagement"]),
-            video_professionalism=float(row["videoProfessionalism"]),
-            total_score=float(row["totalScore"]),
+            fillers_score=float(row["fillers_score"]),
+            pause_rate_score=float(row["pause_rate_score"]),
+            emotion_score=float(row["emotion_score"]),
+            energy_score=float(row["energy_score"]),
+            eye_contact_score=float(row["eye_contact_score"]),
+            grammar_score=float(row["grammar_score"]),
+            total_score=float(row["total_score"]),
             video_id=video_id
         )
     except Exception as e:
@@ -47,15 +44,12 @@ async def insert_video_scores(video_id: int, scores: Scores) -> bool:
     try:
         cur.callproc("insert_video_scores", (
             video_id,
-            scores.speech_clarity,
-            scores.speech_fluency,
-            scores.speech_confidence,
-            scores.speech_expressiveness,
-            scores.speech_engagement,
-            scores.facial_confidence,
-            scores.facial_approachability,
-            scores.facial_engagement,
-            scores.video_professionalism,
+            scores.fillers_score,
+            scores.pause_rate_score,
+            scores.emotion_score,
+            scores.energy_score,
+            scores.eye_contact_score,
+            scores.grammar_score,
             scores.total_score
         ))
         conn.commit()

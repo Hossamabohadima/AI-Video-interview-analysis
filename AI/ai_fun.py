@@ -215,30 +215,6 @@ repetition_data = get_word_repetition(example_text)
 
 # new work
 
-def speech_continuity(audio_path):
-    """
-    Estimate speech continuity quality for an audio file.
-
-    Args:
-        audio_path (str): Path to the audio file to analyze.
-
-    Returns:
-        int: Placeholder continuity score (currently not implemented).
-    """
-    # load audio
-    audio = AudioSegment.from_file(audio_path).set_frame_rate(16000).set_channels(1).set_sample_width(2) # 16 bit
-    # convert audio to tensor (format PyTorch 'Silero VAD' can work with)
-    tensor = torch.tensor(np.array(audio.get_array_of_samples()).astype(np.float32) / 32767.0)
-
-    # Detect speech segments
-    speech_timestamps = get_speech_timestamps(tensor, model, sampling_rate=16000)
-
-    # print(speech_timestamps) # uncomment to see the speech time list
-
-    # Calculate percentage
-    speech_duration = sum(ts['end'] - ts['start'] for ts in speech_timestamps)
-    return round(speech_duration / len(tensor) * 100, 2)
-
 def eye_contact(video_capture, frame_step ):
     results = []
 
@@ -288,18 +264,6 @@ def eye_contact(video_capture, frame_step ):
 #new imports for eye contact
 import cv2
 import mediapipe as mp
-
-#new imports for speech_continuity
-import torch
-import numpy as np
-from pydub import AudioSegment
-#for speech_continuity 
-# Load Silero VAD model
-
-model = torch.jit.load('silero_vad.task')
-_, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
-get_speech_timestamps, _, read_audio, _, _ = utils
-result = speech_continuity("C:\\Users\\beeko\\PycharmProjects\\AI-Video-interview-analysis-\\DataSet\\audio.wav")
 
 #for eye contact
 
