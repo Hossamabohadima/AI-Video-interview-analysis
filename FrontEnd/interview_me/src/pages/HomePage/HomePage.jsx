@@ -5,11 +5,12 @@ import robotIcon from "../../assets/robot-icon.svg";
 import timeIcon from "../../assets/time-icon.svg";
 import vector from "../../assets/ai-icon.svg";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const navItems = [
-  { label: "Home", active: true },
-  { label: "How it works", active: false },
-  { label: "Products", active: false, hasDropdown: true },
+  { label: "Home", href: "/", active: true },
+  { label: "How it works", href: "/how-it-works", active: false },
+  { label: "Products", href: "/process-video", active: false, hasDropdown: true },
 ];
 
 const featureCards = [
@@ -53,15 +54,15 @@ export const HomePage = () => {
         <nav className="hidden md:flex items-center gap-8">
           {navItems.map((item) => (
             <div key={item.label} className="relative flex flex items-center gap-1">
-              <button
-                type="button"
+              <Link
+                to={item.href}
                 aria-current={item.active ? "page" : undefined}
                 className={`font-bold text-lg transition-colors ${
                   item.active ? "text-[#009986]" : "text-[#566068] hover:text-[#009986]"
                 }`}
               >
                 {item.label}
-              </button>
+              </Link>
               {item.hasDropdown && (
                 <img
                   src={polygon1}
@@ -72,16 +73,16 @@ export const HomePage = () => {
               )}
             </div>
           ))}
-          <a href="/signup"
-            >
+          <Link
+            to="/signup"
+          >
           <button
-
             type="button"
             className="bg-[#009986] text-white font-semibold text-base px-6 py-2 rounded-2xl hover:bg-[#007a6e] transition-colors"
           >
             Sign up
           </button>
-          </a>
+          </Link>
         </nav>
 
         {/* Mobile Hamburger */}
@@ -104,22 +105,22 @@ export const HomePage = () => {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white shadow-md px-6 py-4 flex flex-col gap-4">
           {navItems.map((item) => (
-            <button
+            <Link
               key={item.label}
-              type="button"
+              to={item.href}
               className={`text-left font-semibold text-lg ${
                 item.active ? "text-[#009986]" : "text-[#566068]"
               }`}
             >
               {item.label}
-            </button>
+            </Link>
           ))}
-          <button
-            type="button"
-            className="bg-[#009986] text-white font-semibold text-base px-6 py-2 rounded-2xl w-fit hover:bg-[#007a6e] transition-colors"
+          <Link
+            to="/signup"
+            className="bg-[#009986] text-white font-semibold text-base px-6 py-2 rounded-2xl w-fit hover:bg-[#007a6e] transition-colors inline-flex items-center justify-center"
           >
             Sign up
-          </button>
+          </Link>
         </div>
       )}
 
@@ -143,22 +144,22 @@ export const HomePage = () => {
             data-driven insights for candidates and recruiters.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <a href="/signup">
+            <Link to="/signup">
               <button
                 type="button"
                 className="bg-[#009986] text-white font-bold text-lg px-8 py-3 rounded-2xl hover:bg-[#007a6e] transition-colors w-full sm:w-auto"
               >
                 I&apos;m a Candidate
               </button>
-            </a>
-            <a href="/signup">
+            </Link>
+            <Link to="/signup">
               <button
                 type="button"
                 className="bg-white border-2 border-[#009986] text-[#009986] font-bold text-lg px-8 py-3 rounded-2xl hover:bg-[#e5e4e2] transition-colors w-full sm:w-auto"
               >
                 I&apos;m a Recruiter
               </button>
-            </a>
+            </Link>
           </div>
         </div>
 

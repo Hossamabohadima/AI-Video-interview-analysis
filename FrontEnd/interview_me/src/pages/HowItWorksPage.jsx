@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 const steps = [
   {
@@ -107,20 +108,20 @@ function HowItWorksPage() {
         </div>
 
         <nav aria-label="Primary" className="flex items-center gap-[36px]">
-          <a
-            href="#"
+          <Link
+            to="/"
             className="inline-flex min-w-[62px] items-center justify-center text-[#56606B] text-[25px] font-bold whitespace-nowrap [font-family:'Alegreya_Sans',Helvetica]"
           >
             Home
-          </a>
+          </Link>
 
-          <a
-            href="#"
+          <Link
+            to="/how-it-works"
             aria-current="page"
             className="inline-flex min-w-[62px] items-center justify-center text-[#56606B] text-[25px] font-bold whitespace-nowrap [font-family:'Alegreya_Sans',Helvetica]"
           >
             How it works
-          </a>
+          </Link>
 
           <div
             ref={productsRef}
@@ -153,8 +154,8 @@ function HowItWorksPage() {
             {productsOpen && (
               <div className="absolute top-[50px] left-1/2 z-30 w-[340px] -translate-x-1/2 rounded-[20px] bg-[#E6F7F5] px-5 py-5 shadow-[0_6px_14px_rgba(0,0,0,0.12)]">
                 <div className="flex flex-col gap-4">
-                  <a
-                    href="#"
+                  <Link
+                    to="/process-video"
                     className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
                   >
                     <svg
@@ -174,10 +175,10 @@ function HowItWorksPage() {
                     <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
                       Analyze my interview
                     </span>
-                  </a>
+                  </Link>
 
-                  <a
-                    href="#"
+                  <Link
+                    to="/report"
                     className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
                   >
                     <svg
@@ -198,20 +199,20 @@ function HowItWorksPage() {
                     <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
                       View my report
                     </span>
-                  </a>
+                  </Link>
                 </div>
               </div>
             )}
           </div>
 
-          <a
-            href="#"
+          <Link
+            to="/signup"
             className="ml-[8px] h-[45px] px-[28px] rounded-[15px] bg-[#009986] inline-flex items-center justify-center"
           >
             <span className="[font-family:'Alegreya_Sans',Helvetica] font-medium text-white text-[25px] leading-[normal] whitespace-nowrap">
               Sign up
             </span>
-          </a>
+          </Link>
         </nav>
       </header>
 

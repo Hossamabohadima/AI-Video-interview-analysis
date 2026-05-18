@@ -1,10 +1,11 @@
 import { useId, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import polygon1 from "../../assets/polygon.svg";
 
 const navItems = [
   { label: "Home", href: "/" },
-  { label: "How it works", href: "#" },
-  { label: "Products", href: "#", hasDropdown: true },
+  { label: "How it works", href: "/how-it-works" },
+  { label: "Products", href: "/process-video", hasDropdown: true },
 ];
 
 const fieldDefinitions = [
@@ -105,20 +106,20 @@ export const SignUp = () => {
 
       {/* ── NAVBAR ── */}
       <header className="w-full px-6 py-4 flex items-center justify-between">
-        <a href="/" aria-label="Interview me home" className="font-['Pacifico'] text-[#009986] text-2xl md:text-3xl whitespace-nowrap">
+        <Link to="/" aria-label="Interview me home" className="font-['Pacifico'] text-[#009986] text-2xl md:text-3xl whitespace-nowrap">
           Interview me
-        </a>
+        </Link>
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8" aria-label="Primary navigation">
           {navItems.map((item) => (
             <div key={item.label} className="relative flex flex items-center gap-1">
-              <a
-                href={item.href}
+              <Link
+                to={item.href}
                 className="font-bold text-lg text-[#566068] hover:text-[#009986] transition-colors"
               >
                 {item.label}
-              </a>
+              </Link>
               {item.hasDropdown && (
                 <img src={polygon1} alt="" className="w-2.5 h-2 mt-1" aria-hidden="true" />
               )}
@@ -249,12 +250,12 @@ export const SignUp = () => {
 
             <div className="text-center text-[#d9d9d9] font-bold text-lg">or</div>
 
-            <a
-              href="/"
+            <Link
+              to="/sign-in"
               className="w-full border-2 border-[#009986] text-[#009986] font-bold text-lg py-2.5 rounded-2xl text-center hover:bg-[#e5e4e2] transition-colors"
             >
               Log in
-            </a>
+            </Link>
           </form>
         </section>
       </main>
