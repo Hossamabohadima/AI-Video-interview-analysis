@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 function SignInPage() {
   const [productsOpen, setProductsOpen] = useState(false);
@@ -26,19 +27,19 @@ function SignInPage() {
         </div>
 
         <nav className="flex items-center gap-10">
-          <a
-            href="#"
+          <Link
+            to="/"
             className="text-[18px] font-semibold text-[#56606B] hover:text-[#0FA99D]"
           >
             Home
-          </a>
+          </Link>
 
-          <a
-            href="#"
+          <Link
+            to="/how-it-works"
             className="text-[18px] font-semibold text-[#56606B] hover:text-[#0FA99D]"
           >
             How it works
-          </a>
+          </Link>
 
           <div
             ref={productsRef}
@@ -64,8 +65,8 @@ function SignInPage() {
             {productsOpen && (
               <div className="absolute top-[42px] left-1/2 z-30 w-[340px] -translate-x-1/2 rounded-[20px] bg-[#E6F7F5] px-5 py-5 shadow-[0_6px_14px_rgba(0,0,0,0.12)]">
                 <div className="flex flex-col gap-4">
-                  <a
-                    href="#"
+                  <Link
+                    to="/process-video"
                     className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
                   >
                     <svg
@@ -85,10 +86,10 @@ function SignInPage() {
                     <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
                       Analyze my interview
                     </span>
-                  </a>
+                  </Link>
 
-                  <a
-                    href="#"
+                  <Link
+                    to="/report"
                     className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
                   >
                     <svg
@@ -109,18 +110,18 @@ function SignInPage() {
                     <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
                       View my report
                     </span>
-                  </a>
+                    </Link>
                 </div>
               </div>
             )}
           </div>
 
-          <a
-            href="#"
+          <Link
+            to="/signup"
             className="rounded-full bg-[#0FA99D] px-6 py-2 text-[16px] font-semibold text-white hover:bg-[#0c8f85]"
           >
             Sign up
-          </a>
+          </Link>
         </nav>
       </header>
 
@@ -202,12 +203,12 @@ function SignInPage() {
               Forgotten password?
             </button>
 
-            <button
-              type="button"
-              className="mt-2 h-[46px] rounded-full border-2 border-[#0FA99D] bg-white text-[18px] font-bold text-[#0FA99D] hover:bg-[#F0FDFA]"
+            <Link
+              to="/signup"
+              className="mt-2 inline-flex h-[46px] w-full items-center justify-center rounded-full border-2 border-[#0FA99D] bg-white text-[18px] font-bold text-[#0FA99D] hover:bg-[#F0FDFA]"
             >
               Create new account
-            </button>
+            </Link>
           </form>
         </div>
       </main>

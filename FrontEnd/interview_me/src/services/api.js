@@ -12,7 +12,7 @@
 
 // ── BASE CONFIG (swap this when backend is ready) ─────────────────────────────
 
-const BASE_URL = process.env.REACT_APP_API_URL || "";
+const BASE_URL = import.meta.env.VITE_API_URL || "";
 const IS_MOCK  = !BASE_URL; // automatically uses mock when no API URL is set
 
 // ── GENERIC FETCH WRAPPER ─────────────────────────────────────────────────────
