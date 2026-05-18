@@ -1,10 +1,5 @@
 from pydoc import text
-
 from .IAnalysisModel import IAnalysisModel, AnalysisInput
-from nltk.corpus import stopwords
-from collections import Counter
-import nltk
-import re
 import language_tool_python
 
 class TextAnalysis(IAnalysisModel):
@@ -15,13 +10,23 @@ class TextAnalysis(IAnalysisModel):
     based on the provided Whisper transcription results.
     """
 
-    def __init__(self):
+    def __init__(self, grammar_tool=None):
         """
         Initialize the TextAnalysis model.
+        
+        Args:
+            grammar_tool (optional): Injected LanguageTool instance. If None, initializes a new one.
         """
         super().__init__("TextAnalysis")
         self.model = None
-        self.grammar_tool = language_tool_python.LanguageTool('en-US')
+        if grammar_tool is not None:
+            self.grammar_tool = grammar_tool
+        else:
+            try:
+                self.grammar_tool = language_tool_python.LanguageTool('en-US')
+            except Exception as e:
+                print(f"Warning: Failed to initialize grammar tool: {e}")
+                self.grammar_tool = None
 
     def _extract_words_and_text(self, whisper_result):
         """
@@ -43,36 +48,48 @@ class TextAnalysis(IAnalysisModel):
                 words_only.append(w)         
         return words_only, full_text
 
-    def _speech_rate(self, words):
-        """Calculate speech rate in words per minute (WPM).
-        
-        Args:
-            words (list): List of word dictionaries with 'start' and 'end' timestamps.
-        
-        Returns:
-            float: Speech rate in words per minute.
-        """
-        duration = words[-1]['end'] - words[0]['start']
-        total_words = len(words)
-        return float(total_words / (duration / 60))
 
-    def _pause_rate(self, words):
+    def _pause_quality_score(self, words, min_threshold=0.25, ideal_min=0.4, ideal_max=0.8):
         """
-        Calculate pause rate as the average duration of pauses per second of speech.
+        Calculate the percentage of pauses that fall within the ideal natural range (around 0.6s).
+        // ratio according to https://pmc.ncbi.nlm.nih.gov/articles/PMC8874014/
         
         Args:
             words (list): List of word dictionaries with 'start' and 'end' timestamps.
+            min_threshold (float): Minimum gap to be considered a pause (ignores phonetic stops).
+            ideal_min (float): Lower bound of a natural-sounding pause.
+            ideal_max (float): Upper bound of a natural-sounding pause.
         
         Returns:
-            float: Pause rate in seconds of pause per second of speech.
+            float: Percentage of pauses that are considered "ideal" (0 to 100).
         """
-        duration = words[-1]['end'] - words[0]['start']
-        pauses = []
+        if not words or len(words) < 2:
+            return 0.0
+            
+        real_pauses = []
+        ideal_pauses = []
+        
         for i in range(len(words)-1):
             gap = words[i+1]['start'] - words[i]['end']
-            if gap > 1.0:  
-                pauses.append(gap)
-        return sum(pauses) / duration if pauses else 0
+            
+            # 2. Use the DETECTOR (0.25s) to filter out mechanical mouth movements
+            if gap > min_threshold:  
+                real_pauses.append(gap)
+                
+                # 3. Use the GRADER zone (0.4s to 0.8s, centered on 0.6s) to evaluate quality
+                if ideal_min <= gap <= ideal_max:
+                    ideal_pauses.append(gap)
+                    
+        # If they never paused, they get a 0 score for natural pacing
+        if not real_pauses:
+            return 0.0
+            
+        # 4. Calculate the score: what percentage of their pauses were "perfect"?
+        quality_score = (len(ideal_pauses) / len(real_pauses)) * 100
+        
+        return round(quality_score, 2)
+
+ 
 
     def _count_fillers(self, words, fillers=["um", "uh", "like", "you know", "ah", "ahh", "oh", "hmm", "er", "mm", "mmm", "uhm", "huh", "eh", "uhhh", "so", "actually", "basically", "right", "well", "you see", "I mean", "kind of", "sort of"]):
         """
@@ -89,33 +106,6 @@ class TextAnalysis(IAnalysisModel):
         filler_count = sum(1 for w in words if w["word"].lower() in fillers)
         return total_words, filler_count
 
-    def _get_word_repetition(self, full_text):
-        """
-        Calculates the frequency of each word in a text string, excluding stop words and punctuation.
-
-        Args:
-            full_text (str): The full text transcript.
-
-        Returns:
-            dict: A dictionary with words as keys and their frequencies as values, sorted by frequency.
-        """
-        if not full_text:
-            return {}
-
-        # lowercase all
-        words = nltk.word_tokenize(full_text.lower())
-
-        # keep words only (removes numbers and punctuation)
-        words = [w for w in words if re.match(r'[a-z]+$', w)]
-
-        # remove stop words
-        stop_words = set(stopwords.words('english'))
-        filtered_words = [w for w in words if w not in stop_words]
-
-        repetition_counts = Counter(filtered_words)
-
-        # return sorted dict
-        return dict(repetition_counts.most_common())
 
     def _grammar_mistakes(self, full_text):
         """
@@ -125,10 +115,13 @@ class TextAnalysis(IAnalysisModel):
             full_text (str): The full text transcript.
 
         Returns:
-            list: List of grammar mistake dictionaries with details about each error.
+            tuple: (mistakes_list, grammar_score, num_errors, word_count)
         """
         if not full_text:
-            return []
+            return [], 100.0, 0, 0
+        
+        if self.grammar_tool is None:
+            return [], 100.0, 0, len(full_text.split())
         
         matches = self.grammar_tool.check(full_text)
         mistakes = []
@@ -145,7 +138,7 @@ class TextAnalysis(IAnalysisModel):
         num_errors = len(mistakes)
         word_count = max(len(full_text.split()), 1)
 
-        grammar_score = max(0, 100 - (num_errors / word_count * 100))
+        grammar_score = max(0.0, 1.0 - (num_errors / word_count))
         
         return mistakes, grammar_score, num_errors, word_count
 
@@ -157,25 +150,21 @@ class TextAnalysis(IAnalysisModel):
             input_data (AnalysisInput): Input model containing whisper_result.
 
         Returns:
-            dict: A dictionary containing computed metrics like speech_rate, pause_rate, etc.
+            dict: A dictionary containing computed metrics like  pause_rate, etc.
         """
         if not input_data.whisper_result:
             raise ValueError("TextAnalysis requires input_data.whisper_result")
 
         whisper_result = input_data.whisper_result
         words, full_text = self._extract_words_and_text(whisper_result)
-        speech_rate_val = self._speech_rate(words)
-        pause_rate_val = self._pause_rate(words)
+        pause_rate_val = self._pause_quality_score(words)
         total_words, filler_count = self._count_fillers(words)
-        repetition = self._get_word_repetition(full_text)
         grammar_mistakes, grammar_score, num_errors, word_count = self._grammar_mistakes(full_text)
  
         return {
-            "speech_rate": speech_rate_val,
             "pause_rate": pause_rate_val,
             "total_words": total_words,
             "filler_count": filler_count,
-            "word_repetition": repetition,
             "grammar_errors_count": len(grammar_mistakes),
             "grammar_errors_details": grammar_mistakes,
             "grammar_score": grammar_score

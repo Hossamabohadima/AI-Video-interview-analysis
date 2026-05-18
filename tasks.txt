@@ -1,22 +1,18 @@
 done
 AI:
-1-rate of speach in minutes
-
-                  parameters words from whisper
-			return rate of speach in minutes
-2-number of fillers word
+1-number of fillers word
 
                   parameters words from whisper and fillers word(option) 
 				return total nubmer of words and the number of fillers word
-3-rate of stop between words in seconds
+2-rate of stop between words in seconds
                                 parameters words from whisper
 				 return rate of stop between words in seconds
-4-Analyze facial emotions in a video using a pre-trained model.\n
+3-Analyze facial emotions in a video using a pre-trained model.\n
     Parameters:\n
     cap: OpenCV VideoCapture object for the video to analyze\n
     Returns:\n
     dict: A dictionary containing the average confidence for each emotion.
-5-Calculates energy statistics for a given audio signal.
+4-Calculates energy statistics for a given audio signal.
 
     Args:
         audio_signal (np.ndarray): The mono audio signal (x).
@@ -25,32 +21,42 @@ AI:
     Returns:
         dict: Average, Max, Min, and Std of the speech energy.
 
-6-Calculates the frequency of each word in a text string,
-    excluding stop words and punctuation.
-	 the function take text and return tthe repeat of each word
-
-7-find eye contact
+5-find eye contact
 
                         the function take VideoCapture and the N (frames to workon (# Analyze every N rd frame))
 
                                                 and return list for iris position for this frames
 
-8-countines of speech
-                                the function take audio and return the percentage for countines of speech
-
-9- grammar the function take text
+6- grammar the function take text
 
                                                 and return list gramer mistakes 
 
  
 
 task to do :
-compare function and score function using llm models
 
-add fun for Grammer from ai to back end should kaseb do it
-update the name of wight and score in function and database to be like the 9 features we evaluate update compare api that get more that 2 not just 2
+score function 
+filler_rate = (filler_count / total_words) * 100
+
+rate of stop between words in seconds use this to convert to percentage
+https://pmc.ncbi.nlm.nih.gov/articles/PMC8874014/
+
+facial emotions
+Score = (Happy +Neutral ) + ({Surprise}* 0.5) - ({other}*  1.0)
+
+energy statistics convert to percentage 
+
+5-find eye contact
+    avg_eye_contact = sum(scores) / len(scores)
+
+6- grammar the function take text
+    Error_Rate =(Number of Mistakes/Total Word Count)* 100
+
+total score = sum (each score * wight)
+
+compare function and report function using llm 
+
+update compare api that get more that 2 not just 2
 
 
 front end 
-
-ui abubakerelsiddig should work one it

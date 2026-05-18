@@ -12,27 +12,15 @@ CREATE TABLE Users (
     phoneNumber VARCHAR(20), 
     role user_role NOT NULL 
 );
+
 -- 3. Create Threshold table
 CREATE TABLE Threshold (
     userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
     thresholdValue DECIMAL(5,2) NOT NULL
 );
--- 4. Create MetricWeight table
-CREATE TABLE MetricWeight (
-    userID int PRIMARY KEY REFERENCES Users(userid) ON DELETE CASCADE,
-   SpeechClarity DECIMAL(5,2) default 0,
-   SpeechFluency DECIMAL(5,2) default 0,
-   SpeechConfidence DECIMAL(5,2) default 0,
-   SpeechExpressiveness DECIMAL(5,2) default 0,
-   SpeechEngagement DECIMAL(5,2) default 0,
-   FacialConfidence DECIMAL(5,2) default 0,
-   FacialApproachability DECIMAL(5,2) default 0,
-   FacialEngagement DECIMAL(5,2) default 0,
-   VideoProfessionalism DECIMAL(5,2) default 0
-    CONSTRAINT metric_score_limit 
-    CHECK (SpeechClarity + SpeechFluency + SpeechConfidence + SpeechExpressiveness + SpeechEngagement + FacialConfidence + FacialApproachability + FacialEngagement + VideoProfessionalism = 1.0)
 
-);
+
+
 -- 5. Create Video table
 CREATE TABLE Video (
     videoID SERIAL PRIMARY KEY,
@@ -42,19 +30,48 @@ CREATE TABLE Video (
     duration DECIMAL(5,2) ,
     status videoStatus NOT NULL 
 );
--- 6. Create videoScore table
-CREATE   TABLE videoScore (
-    videoID int PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
-   SpeechClarity DECIMAL(5,2) default 0,
-   SpeechFluency DECIMAL(5,2) default 0,
-   SpeechConfidence DECIMAL(5,2) default 0,
-   SpeechExpressiveness DECIMAL(5,2) default 0,
-   SpeechEngagement DECIMAL(5,2) default 0,
-   FacialConfidence DECIMAL(5,2) default 0,
-   FacialApproachability DECIMAL(5,2) default 0,
-   FacialEngagement DECIMAL(5,2) default 0,
-   VideoProfessionalism DECIMAL(5,2) default 0,
-   totalScore DECIMAL(5,2) default 0,
+
+-- 6. Create VideoMetricWeight table for per-video weight storage
+CREATE TABLE VideoMetricWeight (
+    videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
+    fillers_weight DECIMAL(5,4) NOT NULL,
+    pause_rate_weight DECIMAL(5,4) NOT NULL,
+    emotion_weight DECIMAL(5,4) NOT NULL,
+    energy_weight DECIMAL(5,4) NOT NULL,
+    eye_contact_weight DECIMAL(5,4) NOT NULL,
+    grammar_weight DECIMAL(5,4) NOT NULL,
+    CONSTRAINT video_metric_weight_sum CHECK (
+        fillers_weight +
+        pause_rate_weight +
+        emotion_weight +
+        energy_weight +
+        eye_contact_weight +
+        grammar_weight = 1.0
+    )
+);
+
+-- 7. Create videoScore table
+CREATE TABLE videoScore (
+    videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
+    fillers_score DECIMAL(5,2) DEFAULT 0,
+    pause_rate_score DECIMAL(5,2) DEFAULT 0,
+    emotion_score DECIMAL(5,2) DEFAULT 0,
+    energy_score DECIMAL(5,2) DEFAULT 0,
+    eye_contact_score DECIMAL(5,2) DEFAULT 0,
+    grammar_score DECIMAL(5,2) DEFAULT 0,
+    total_score DECIMAL(5,2) DEFAULT 0,
     CONSTRAINT score_limit 
-    CHECK (totalScore >= 0 AND totalScore <= 100)
-   ); 
+    CHECK (total_score >= 0 AND total_score <= 100)
+);
+   
+-- 7. Create videoAnalysis table
+CREATE TABLE VideoAnalysis (
+    videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
+    fillers_Word JSONB,
+    rate_Of_Stop DECIMAL(10,4), 
+    emotion_analysis JSONB,
+    energy_Statistics JSONB,
+    eye_Contact       JSONB,
+    grammar_Mistakes JSONB,
+    total_Score DECIMAL(10,4)
+);
