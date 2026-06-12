@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .api.user import router as user_router
 from .api.user_auth import router as auth_router
 from .api.metrics import router as metrics_router
@@ -9,6 +10,21 @@ app = FastAPI(
     title="interviewMe",
     docs_url="/interviewMe",  # This changes http://127.0.0.1:8000/docs to /interviewMe
     redoc_url=None           # Optional: disables the alternative /redoc path
+)
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router)

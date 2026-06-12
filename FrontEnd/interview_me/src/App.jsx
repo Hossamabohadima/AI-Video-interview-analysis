@@ -34,19 +34,31 @@ const AppRoutes = () => (
     <Route path="/signup" element={<SignUp />} />
     <Route path="/how-it-works" element={<HowItWorksPage />} />
     <Route path="/history" element={<CandidateHistoryPage />} />
-    <Route path="/report" element={<CandidateReportPage />} />
+    <Route path="/report/:id" element={<CandidateReportPage />} />
     <Route path="/process-video" element={<ProcessVideoPage />} />
     <Route
       path="/dashboard"
-      element={<ProtectedRoute><CandidateDashboard /></ProtectedRoute>}
+      element={
+        <ProtectedRoute>
+          <CandidateDashboard />
+        </ProtectedRoute>
+      }
     />
     <Route
       path="/recruiter-history"
-      element={<ProtectedRoute><RecruiterHistory /></ProtectedRoute>}
+      element={
+        <ProtectedRoute>
+          <RecruiterHistory />
+        </ProtectedRoute>
+      }
     />
     <Route
       path="/recruiter-report"
-      element={<ProtectedRoute><RecruiterReport /></ProtectedRoute>}
+      element={
+        <ProtectedRoute>
+          <RecruiterReport />
+        </ProtectedRoute>
+      }
     />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function SignInPage() {
   const [productsOpen, setProductsOpen] = useState(false);
   const productsRef = useRef(null);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -17,6 +23,49 @@ function SignInPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/users/auth/login", {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.detail === "string" ? data.detail : "Login failed",
+        );
+      }
+
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("token_type", data.token_type);
+      localStorage.setItem("user_id", String(data.user_id));
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("name", data.name);
+
+      console.log("Login successful:", data);
+
+      navigate("/process-video");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-[#E8E6E2] flex flex-col">
@@ -110,7 +159,7 @@ function SignInPage() {
                     <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
                       View my report
                     </span>
-                    </Link>
+                  </Link>
                 </div>
               </div>
             )}
@@ -132,7 +181,7 @@ function SignInPage() {
             Welcome Back
           </h1>
 
-          <form className="flex flex-col gap-5">
+          <form className="flex flex-col gap-5" onSubmit={handleLogin}>
             <div>
               <label className="mb-2 block text-[14px] font-semibold uppercase text-[#8B8B8B]">
                 Email Address
@@ -156,6 +205,8 @@ function SignInPage() {
                 <input
                   type="email"
                   placeholder=""
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-transparent text-[14px] text-[#374151] outline-none"
                 />
               </div>
@@ -184,16 +235,21 @@ function SignInPage() {
                 <input
                   type="password"
                   placeholder=""
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-transparent text-[14px] text-[#374151] outline-none"
                 />
               </div>
             </div>
 
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
             <button
               type="submit"
-              className="mt-2 h-[46px] rounded-full bg-[#0FA99D] text-[18px] font-bold text-white hover:bg-[#0c8f85]"
+              disabled={loading}
+              className="mt-2 h-[46px] rounded-full bg-[#0FA99D] text-[18px] font-bold text-white hover:bg-[#0c8f85] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Log in
+              {loading ? "Logging in..." : "Log in"}
             </button>
 
             <button
