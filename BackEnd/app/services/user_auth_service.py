@@ -76,8 +76,9 @@ async def login_user(login_request: LoginRequest) -> Token:
         
         return Token(
             access_token=access_token,
+            name=user["name"],
             user_id=user["userid"],
-            role=user["role"]
+            role=user["role"],
         )
     except Exception as e:
         raise ValueError(f"Login failed: {str(e)}")
