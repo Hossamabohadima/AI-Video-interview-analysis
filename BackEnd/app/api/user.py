@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
-from ..schemas.Threshold import Threshold
-from decimal import Decimal
+from ..schemas.video import MetricWeights, VideoComparisonRequest
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
@@ -32,20 +31,21 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/reports/compare", status_code=status.HTTP_200_OK)
-async def compare_user_reports(video1: int, video2: int, current_user: dict = Depends(get_current_user)):
+async def compare_user_reports(
+    payload: VideoComparisonRequest,
+    current_user: dict = Depends(get_current_user)
+):
     try:
-        result = await compare_reports(video1, video2)
-        if len(result) < 2: # Changed from <= 1 for clarity
+        result = await compare_reports(payload.video_ids, current_user["user_id"])
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="At least one video not found for comparison"
+                detail="No videos found for comparison"
             )
         return {"comparison": result}
     except HTTPException as e:
-        # Re-raise HTTPExceptions so we see the actual 404 or 500 detail
         raise e
     except Exception as e:
-        # Log the real error to your terminal!
         print(f"CRITICAL ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -76,51 +76,47 @@ async def update_user_threshold(score: float, current_user: dict = Depends(get_c
 
 
 @router.post("/videos/upload", status_code=status.HTTP_201_CREATED)
-async def upload_video(
-    file: UploadFile = File(...),
-    video_name: str = Form(...),
+async def upload_videos(
+    files: list[UploadFile] = File(...),
+    video_names: list[str] = Form(...),
+    fillers_weight: float = Form(...),
+    pause_rate_weight: float = Form(...),
+    emotion_weight: float = Form(...),
+    energy_weight: float = Form(...),
+    eye_contact_weight: float = Form(...),
+    grammar_weight: float = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload and process a video for analysis."""
-    try:
-        result = await handle_uploaded_video(file, current_user["user_id"], video_name)
-        return result
-    except ValueError as e:
+    """Upload and process multiple videos with metric weights."""
+    if len(files) != len(video_names):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process video"
+            detail="The number of files must match the number of video names"
         )
 
+    weights = MetricWeights(
+        fillers_weight=fillers_weight,
+        pause_rate_weight=pause_rate_weight,
+        emotion_weight=emotion_weight,
+        energy_weight=energy_weight,
+        eye_contact_weight=eye_contact_weight,
+        grammar_weight=grammar_weight,
+    )
 
-@router.put("/weights-legacy", status_code=status.HTTP_200_OK, deprecated=True)
-async def update_weights_legacy(weights: dict, current_user: dict = Depends(get_current_user)):
-    """[DEPRECATED] Update metric weights. Use /metrics/weights instead."""
-    if not weights:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Weights cannot be empty"
-        )
-    
-    try:
-        success = await set_weights(current_user["user_id"], weights)
-        if not success:
+    results = []
+    for file, video_name in zip(files, video_names):
+        try:
+            result = await handle_uploaded_video(file, current_user["user_id"], video_name, weights)
+            results.append(result)
+        except ValueError as e:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
             )
-        return {"message": "Weights updated successfully"}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update weights"
-        )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process uploaded videos"
+            )
+
+    return {"uploaded_videos": results}
