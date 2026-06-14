@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import dashboardIcon from "../../assets/dashboard.svg";
-import uploadIcon    from "../../assets/upload.svg";
-import historyIcon   from "../../assets/history.svg";
+import uploadIcon  from "../../assets/upload.svg";
+import historyIcon from "../../assets/history.svg";
 
 /**
  * DashboardSidebar
@@ -14,9 +13,8 @@ import historyIcon   from "../../assets/history.svg";
  */
 
 const NAV_ITEMS = [
-  { id: "dashboard",         label: "Dashboard",        href: "/dashboard",         icon: dashboardIcon },
-  { id: "analyze-interview", label: "Analyze Interview", href: "/analyze-interview", icon: uploadIcon    },
-  { id: "history",           label: "History",           href: "/recruiter-history",           icon: historyIcon   },
+  { id: "analyze-interview", label: "Analyze Interview", href: "/analyze-interview", icon: uploadIcon  },
+  { id: "history",           label: "History",           href: "/recruiter-history", icon: historyIcon },
 ];
 
 const DashboardSidebar = ({ isOpen, onClose }) => {
@@ -35,12 +33,10 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
         <div className="h-[73px] border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <Link
             to="/"
-            className="font-['Pacifico'] text-[#009986] text-2xl "
+            className="font-['Pacifico'] text-[#009986] text-3xl whitespace-nowrap"
             aria-label="Interview me home"
           >
-            <span style={{ fontFamily: 'Pacifico' }} className="font-Pacifico text-[#009986] text-3xl md:text-3xl whitespace-nowrap">
-                Interview me
-            </span>
+            Interview me
           </Link>
 
           {/* Close button — mobile only */}
@@ -56,10 +52,11 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Nav items — active state auto-detected from URL */}
+        {/* Nav items */}
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto" aria-label="Primary">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href ||
+              (item.href === "/recruiter-history" && pathname === "/recruiter-report");
             return (
               <Link
                 key={item.id}
