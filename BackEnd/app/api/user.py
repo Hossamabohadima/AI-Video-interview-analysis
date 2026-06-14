@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
 from ..schemas.Threshold import Threshold
+from ..schemas.video import MetricWeights
 from decimal import Decimal
 from ..services.user_service import (
     get_reports, 
@@ -24,10 +25,10 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve reports"
+            detail=f"Failed to retrieve reports: {str(e)}"
         )
 
 
@@ -35,12 +36,11 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
 async def compare_user_reports(video1: int, video2: int, current_user: dict = Depends(get_current_user)):
     try:
         result = await compare_reports(video1, video2)
-        if len(result) < 2: # Changed from <= 1 for clarity
+        if len(result) < 2:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="At least one video not found for comparison"
             )
-
         return {"comparison": result}
     except HTTPException as e:
         raise e
@@ -50,6 +50,7 @@ async def compare_user_reports(video1: int, video2: int, current_user: dict = De
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal Server Error: {str(e)}"
         )
+
 
 @router.put("/threshold", status_code=status.HTTP_200_OK)
 async def update_user_threshold(score: float, current_user: dict = Depends(get_current_user)):
@@ -67,10 +68,10 @@ async def update_user_threshold(score: float, current_user: dict = Depends(get_c
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update threshold"
+            detail=f"Failed to update threshold: {str(e)}"
         )
 
 
@@ -113,9 +114,10 @@ async def upload_videos(
                 detail=str(e)
             )
         except Exception as e:
+            # Detailed error for debugging — revert to generic message in production
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process uploaded videos"
+                detail=f"Failed to process video '{video_name}': {str(e)}"
             )
 
     return {"uploaded_videos": results}
