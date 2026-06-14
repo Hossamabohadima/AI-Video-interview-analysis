@@ -1,48 +1,62 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getCurrentUser, login as apiLogin, logout as apiLogout, signUp as apiSignUp } from "../services/api";
+import { login as apiLogin, signUp as apiSignUp } from "../services/api";
 
 /**
  * AuthContext
- * Global authentication state — user, loading, error.
- * Any component can access this via useAuth().
+ * Global authentication state using real JWT backend.
  *
- * Provides:
- * - user       : current user object or null
- * - isLoading  : true while checking auth status
- * - error      : last auth error message or null
- * - isAuth     : true if user is logged in
- * - login(email, password)
- * - signUp(userData)
- * - logout()
+ * Token shape from backend:
+ * { access_token, token_type: "bearer", user_id, role }
+ *
+ * User shape stored in context:
+ * { user_id, name, email, role, roleLabel, initials }
  */
 
 const AuthContext = createContext(null);
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+
+const getInitials = (name = "") =>
+  name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
+const getRoleLabel = (role = "") => {
+  if (role === "RECRUITER") return "Recruiter Admin";
+  if (role === "USER")      return "Candidate";
+  return role;
+};
+
+const persistAuth = (user, token) => {
+  localStorage.setItem("token", token);
+  localStorage.setItem("user",  JSON.stringify(user));
+};
+
+const clearAuth = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+};
+
+const loadPersistedUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+// ── PROVIDER ──────────────────────────────────────────────────────────────────
 
 export const AuthProvider = ({ children }) => {
   const [user,      setUser]      = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState(null);
 
-  // ── Check if user is already logged in on mount ───────────────────────────
+  // Rehydrate from localStorage on mount
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-      } catch {
-        localStorage.removeItem("token");
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
+    const token      = localStorage.getItem("token");
+    const cachedUser = loadPersistedUser();
+    if (token && cachedUser) setUser(cachedUser);
+    setIsLoading(false);
   }, []);
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -50,10 +64,21 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     setIsLoading(true);
     try {
-      const { user: loggedInUser, token } = await apiLogin(email, password);
-      localStorage.setItem("token", token);
-      setUser(loggedInUser);
-      return loggedInUser;
+      // POST /users/auth/login → { access_token, token_type, user_id, role }
+      const tokenData = await apiLogin({ email, password });
+
+      const user = {
+        user_id:   tokenData.user_id,
+        role:      tokenData.role,
+        roleLabel: getRoleLabel(tokenData.role),
+        name:      email.split("@")[0],
+        email,
+        initials:  getInitials(email.split("@")[0]),
+      };
+
+      persistAuth(user, tokenData.access_token);
+      setUser(user);
+      return user;
     } catch (err) {
       setError(err.message || "Login failed");
       throw err;
@@ -67,10 +92,37 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     setIsLoading(true);
     try {
-      const { user: newUser, token } = await apiSignUp(userData);
-      localStorage.setItem("token", token);
-      setUser(newUser);
-      return newUser;
+      // Map frontend fields → backend Registration schema
+      const payload = {
+        name:         userData.fullName  || userData.name,
+        email:        userData.email,
+        password:     userData.password,
+        phone_number: userData.phone     || userData.phone_number || null,
+        role:         userData.userType === "Company" ? "RECRUITER" : "USER",
+      };
+
+      // POST /users/auth/signup → { user_id, name, email, role, created_date }
+      const newUser = await apiSignUp(payload);
+
+      // Auto-login after signup to get token
+      const tokenData = await apiLogin({
+        email:    payload.email,
+        password: payload.password,
+      });
+
+      const user = {
+        user_id:   newUser.user_id,
+        name:      newUser.name,
+        email:     newUser.email,
+        role:      newUser.role,
+        roleLabel: getRoleLabel(newUser.role),
+        initials:  getInitials(newUser.name),
+        created_date: newUser.created_date,
+      };
+
+      persistAuth(user, tokenData.access_token);
+      setUser(user);
+      return user;
     } catch (err) {
       setError(err.message || "Sign up failed");
       throw err;
@@ -80,21 +132,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Logout ────────────────────────────────────────────────────────────────
-  const logout = useCallback(async () => {
+  const logout = useCallback(() => {
+    clearAuth();
+    setUser(null);
     setError(null);
-    try {
-      await apiLogout();
-    } finally {
-      localStorage.removeItem("token");
-      setUser(null);
-    }
   }, []);
 
   const value = {
     user,
     isLoading,
     error,
-    isAuth:  !!user,
+    isAuth: !!user,
     login,
     signUp,
     logout,
@@ -107,16 +155,9 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-/**
- * useAuth
- * Hook to access auth context anywhere in the app.
- * Throws if used outside AuthProvider.
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used inside <AuthProvider>");
-  }
+  if (!context) throw new Error("useAuth must be used inside <AuthProvider>");
   return context;
 };
 

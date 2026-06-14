@@ -36,23 +36,7 @@ const DashboardHeader = ({
           </svg>
         </button>
 
-        {/* Search */}
-        {showSearch && (
-          <form className="relative w-full hidden sm:block" role="search" aria-label="Search dashboard">
-            <label htmlFor={searchId} className="sr-only">
-              Search candidates, reports
-            </label>
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <img className="w-4 h-4" src={searchIcon} alt="" aria-hidden="true" />
-            </div>
-            <input
-              id={searchId}
-              type="search"
-              placeholder="Search candidates, reports ..etc"
-              className="w-full h-[42px] bg-gray-100 rounded-full pl-11 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#009986] border border-transparent transition-all"
-            />
-          </form>
-        )}
+
       </div>
 
       {/* Right: User info */}
