@@ -1,14 +1,23 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .api.user import router as user_router
 from .api.user_auth import router as auth_router
 from .api.metrics import router as metrics_router
 from .api.scores import router as scores_router
 
-# 1. Change the Title and the URL path
 app = FastAPI(
     title="interviewMe",
-    docs_url="/interviewMe",  # This changes http://127.0.0.1:8000/docs to /interviewMe
-    redoc_url=None           # Optional: disables the alternative /redoc path
+    docs_url="/interviewMe",
+    redoc_url=None
+)
+
+# Allow frontend to communicate with backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router)
@@ -16,7 +25,6 @@ app.include_router(metrics_router)
 app.include_router(scores_router)
 app.include_router(user_router)
 
-# 2. Print the custom URL to the terminal
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "★"*40)
