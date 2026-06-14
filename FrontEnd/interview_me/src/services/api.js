@@ -1,238 +1,216 @@
 /**
  * api.js — Service Layer
- *
- * All data fetching lives here. Pages and hooks never call fetch() directly.
- * When the real backend is ready, only this file needs to change.
- *
- * Pattern:
- * - Each function returns a Promise
- * - Mock data is returned now, real API calls replace it later
- * - Error handling is centralized here
+ * All API calls live here. Pages never call fetch() directly.
  */
 
-// ── BASE CONFIG (swap this when backend is ready) ─────────────────────────────
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "";
-const IS_MOCK  = !BASE_URL; // automatically uses mock when no API URL is set
+// ── HELPERS ───────────────────────────────────────────────────────────────────
 
-// ── GENERIC FETCH WRAPPER ─────────────────────────────────────────────────────
+const getToken = () => localStorage.getItem("token");
 
-/**
- * Centralized fetch with error handling.
- * All real API calls go through this.
- */
 const request = async (endpoint, options = {}) => {
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
-
+  const token = getToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+  const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Request failed: ${response.status}`);
+    throw new Error(error.detail || `Request failed: ${response.status}`);
   }
-
+  if (response.status === 204) return null;
   return response.json();
 };
 
-// ── MOCK DATA ─────────────────────────────────────────────────────────────────
-
-const MOCK_USER = {
-  id:       "u-001",
-  name:     "Sarah Ahmed",
-  role:     "Recruiter Admin",
-  initials: "SA",
-  email:    "sarah@interviewme.com",
+const requestFormData = async (endpoint, formData) => {
+  const token = getToken();
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `Upload failed: ${response.status}`);
+  }
+  return response.json();
 };
 
-const MOCK_CANDIDATES = [
-  { id: 1,  name: "Abubaker", scores: [100, 100, 100, 100, 100] },
-  { id: 2,  name: "Ahmed",    scores: [88,  91,  94,  90,  96]  },
-  { id: 3,  name: "Mohamed",  scores: [80,  85,  82,  88,  86]  },
-  { id: 4,  name: "Farouk",   scores: [82,  78,  75,  84,  80]  },
-  { id: 5,  name: "Mahmoud",  scores: [74,  79,  76,  80,  76]  },
-  { id: 6,  name: "Khalid",   scores: [74,  67,  75,  68,  70]  },
-  { id: 7,  name: "Lina",     scores: [76,  60,  72,  58,  60]  },
-  { id: 8,  name: "Aisha",    scores: [71,  47,  50,  60,  76]  },
-  { id: 9,  name: "Omar",     scores: [60,  55,  58,  62,  50]  },
-  { id: 10, name: "Nour",     scores: [45,  50,  48,  52,  46]  },
-  { id: 11, name: "Yara",     scores: [38,  42,  40,  35,  44]  },
-  { id: 12, name: "Kareem",   scores: [30,  28,  35,  32,  25]  },
-];
+// ── AUTH ──────────────────────────────────────────────────────────────────────
 
-const MOCK_BATCHES = [
-  {
-    id:           1,
-    role:         "Senior Frontend Engineer",
-    batchSize:    300,
-    date:         "2026/04/22",
-    passed:       40,
-    avgScore:     65,
-    topScore:     "92%",
-    timeSavedHrs: 48,
-  },
-  {
-    id:           2,
-    role:         "Junior Backend Developer",
-    batchSize:    290,
-    date:         "2026/03/12",
-    passed:       29,
-    avgScore:     54,
-    topScore:     "72%",
-    timeSavedHrs: 40,
-  },
-  {
-    id:           3,
-    role:         "Machine Learning Senior",
-    batchSize:    350,
-    date:         "2026/04/22",
-    passed:       40,
-    avgScore:     65,
-    topScore:     "92%",
-    timeSavedHrs: 35,
-  },
-  {
-    id:           4,
-    role:         "DevOps Developer",
-    batchSize:    311,
-    date:         "2026/03/12",
-    passed:       29,
-    avgScore:     54,
-    topScore:     "72%",
-    timeSavedHrs: 30,
-  },
-];
+export const signUp = async (userData) => {
+  return request("/users/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      name:         userData.name,
+      email:        userData.email,
+      password:     userData.password,
+      phone_number: userData.phone_number || null,
+      role:         userData.role || "USER",
+    }),
+  });
+};
 
-// Simulate network delay for realistic mock behavior
-const mockDelay = (ms = 300) => new Promise((res) => setTimeout(res, ms));
-
-// ── AUTH SERVICES ─────────────────────────────────────────────────────────────
-
-/**
- * Log in a user.
- * @param {string} email
- * @param {string} password
- * @returns {Promise<{ user, token }>}
- */
-export const login = async (email, password) => {
-  if (IS_MOCK) {
-    await mockDelay();
-    if (email && password) {
-      return { user: MOCK_USER, token: "mock-token-123" };
-    }
-    throw new Error("Invalid credentials");
-  }
-
-  return request("/auth/login", {
+export const login = async ({ email, password }) => {
+  return request("/users/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 };
 
-/**
- * Sign up a new user.
- * @param {object} userData - { fullName, email, phone, password, userType }
- * @returns {Promise<{ user, token }>}
- */
-export const signUp = async (userData) => {
-  if (IS_MOCK) {
-    await mockDelay();
-    return { user: { ...MOCK_USER, ...userData }, token: "mock-token-123" };
-  }
+// ── REPORTS ───────────────────────────────────────────────────────────────────
 
-  return request("/auth/signup", {
+/**
+ * Get all video reports for the authenticated user.
+ * GET /users/reports
+ * Returns: { reports: [{ videoid, uploaddate, duration, status, videoname,
+ *   fillers_score, pause_rate_score, emotion_score, energy_score,
+ *   eye_contact_score, grammar_score, total_score }] }
+ */
+export const getReports = async () => {
+  return request("/users/reports");
+};
+
+export const compareReports = async (video1, video2) => {
+  return request(`/users/reports/compare?video1=${video1}&video2=${video2}`, {
     method: "POST",
-    body: JSON.stringify(userData),
   });
 };
 
-/**
- * Log out the current user.
- */
-export const logout = async () => {
-  if (IS_MOCK) {
-    await mockDelay(100);
-    return { success: true };
-  }
+// ── THRESHOLD ─────────────────────────────────────────────────────────────────
 
-  return request("/auth/logout", { method: "POST" });
+/**
+ * Update pass threshold.
+ * Frontend sends 0–100, divided by 100 here → backend receives 0.0–1.0
+ */
+export const updateThreshold = async (scorePercent) => {
+  const score = scorePercent / 100;
+  return request(`/users/threshold?score=${score}`, { method: "PUT" });
+};
+
+// ── VIDEOS ────────────────────────────────────────────────────────────────────
+
+export const uploadVideos = async (files, videoNames, weights) => {
+  const formData = new FormData();
+  files.forEach((file)      => formData.append("files",        file));
+  videoNames.forEach((name) => formData.append("video_names",  name));
+  formData.append("fillers_weight",     weights.fillers_weight);
+  formData.append("pause_rate_weight",  weights.pause_rate_weight);
+  formData.append("emotion_weight",     weights.emotion_weight);
+  formData.append("energy_weight",      weights.energy_weight);
+  formData.append("eye_contact_weight", weights.eye_contact_weight);
+  formData.append("grammar_weight",     weights.grammar_weight);
+  return requestFormData("/users/videos/upload", formData);
+};
+
+// ── SCORES ────────────────────────────────────────────────────────────────────
+
+/**
+ * Get scores for a single video.
+ * GET /scores/{video_id}
+ * Returns all scores as 0.0–1.0 floats.
+ */
+export const getVideoScores = async (videoId) => {
+  return request(`/scores/${videoId}`);
 };
 
 /**
- * Get the currently authenticated user.
- * @returns {Promise<user>}
+ * Get scores for multiple videos at once.
+ * Fetches each video's scores in parallel.
+ * @param {number[]} videoIds
+ * @returns {Promise<Array>} array of score objects with video metadata
  */
-export const getCurrentUser = async () => {
-  if (IS_MOCK) {
-    await mockDelay(200);
-    return MOCK_USER;
-  }
-
-  return request("/auth/me");
+export const getMultipleVideoScores = async (videoIds) => {
+  const results = await Promise.all(
+    videoIds.map((id) => getVideoScores(id).catch(() => null))
+  );
+  return results.filter(Boolean); // remove any failed fetches
 };
 
-// ── CANDIDATE SERVICES ────────────────────────────────────────────────────────
-
-/**
- * Get all candidates for a specific batch.
- * @param {string|number} batchId
- * @returns {Promise<Array>}
- */
-export const getCandidatesByBatch = async (batchId) => {
-  if (IS_MOCK) {
-    await mockDelay();
-    return MOCK_CANDIDATES;
-  }
-
-  return request(`/batches/${batchId}/candidates`);
+export const getMetricWeights = async () => {
+  return request("/metrics/weights");
 };
 
-// ── BATCH / REPORT SERVICES ───────────────────────────────────────────────────
+export const setMetricWeights = async (weights) => {
+  return request("/metrics/weights", {
+    method: "PUT",
+    body: JSON.stringify(weights),
+  });
+};
+
+// ── DERIVED DATA ──────────────────────────────────────────────────────────────
 
 /**
- * Get all batches (for history page).
- * @returns {Promise<Array>}
+ * Get all reports and group them by upload batch.
+ * Since the backend has no batch_id, we group by upload minute —
+ * videos uploaded within the same minute = same batch.
+ *
+ * Returns array of batches:
+ * [{
+ *   batchKey: "2026-06-12T10:30",
+ *   date: "2026/06/12",
+ *   time: "10:30",
+ *   videoIds: [1, 2, 3, 4],
+ *   videoNames: ["Ahmed", "Sara", "Omar", "Lina"],
+ *   count: 4,
+ *   avgScore: 72,
+ *   status: "DONE"
+ * }]
  */
 export const getBatches = async () => {
-  if (IS_MOCK) {
-    await mockDelay();
-    return MOCK_BATCHES;
-  }
+  const { reports } = await getReports();
+  if (!reports || reports.length === 0) return [];
 
-  return request("/batches");
-};
+  // Group by upload minute
+  const groups = {};
+  reports.forEach((r) => {
+    const date= new Date(r.uploaddate);
+    // const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
+    if (!groups[key]) {
+      groups[key] = {
+        batchKey:   key,
+        date:       date.toLocaleDateString("en-CA").replace(/-/g, "/"),
+        time:       date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        videoIds:   [],
+        videoNames: [],
+        scores:     [],
+        statuses:   [],
+      };
+    }
 
-/**
- * Get a single batch report by ID.
- * @param {string|number} batchId
- * @returns {Promise<object>}
- */
-export const getBatchReport = async (batchId) => {
-  if (IS_MOCK) {
-    await mockDelay();
-    return MOCK_BATCHES.find((b) => b.id === batchId) ?? MOCK_BATCHES[0];
-  }
+    groups[key].videoIds.push(r.videoid);
+    // groups[key].videoNames.push(r.videoname);
+    const cleanName = r.videoname.replace(/_[0-9a-f-]{36}\.[^.]+$/, "");
+    groups[key].videoNames.push(cleanName);
+    groups[key].scores.push(r.total_score || 0);
+    groups[key].statuses.push(r.status);
+  });
 
-  return request(`/batches/${batchId}/report`);
-};
+  // Convert to array and calculate batch-level stats
+  return Object.values(groups).map((batch) => {
+    const avgScore  = Math.round(
+      (batch.scores.reduce((a, b) => a + b, 0) / batch.scores.length) * 100
+    );
+    const topScore  = Math.round(Math.max(...batch.scores) * 100);
+    const allDone   = batch.statuses.every((s) => s === "DONE");
+    const anyFailed = batch.statuses.some((s) => s === "FAILED");
 
-/**
- * Get dashboard overview stats.
- * @returns {Promise<object>}
- */
-export const getDashboardStats = async () => {
-  if (IS_MOCK) {
-    await mockDelay();
     return {
-      totalCandidates: 1260,
-      passedThreshold: 40,
-      avgAiMatchScore: 72,
-      timeSavedHrs:    153,
+      batchKey:   batch.batchKey,
+      date:       batch.date,
+      time:       batch.time,
+      videoIds:   batch.videoIds,
+      videoNames: batch.videoNames,
+      count:      batch.videoIds.length,
+      avgScore,
+      topScore:   `${topScore}%`,
+      status:     anyFailed ? "FAILED" : allDone ? "DONE" : "PENDING",
+      // pass IDs as comma-separated string for URL
+      idsParam:   batch.videoIds.join(","),
     };
-  }
-
-  return request("/dashboard/stats");
+  }).sort((a, b) => new Date(b.date) - new Date(a.date)); // newest first
 };

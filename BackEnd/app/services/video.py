@@ -205,7 +205,11 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
 
     All returned scores are normalized to the range 0.0 - 1.0 to match schema expectations. The total_score is a weighted average of the individual metrics, also normalized to 0.0 - 1.0.
     """
+
+    # -------------------------------------------------------
     # Text-based metrics
+    # -------------------------------------------------------
+
     total_words = text_results.get("total_words", 0) or 0
     filler_count = text_results.get("filler_count", 0) or 0
     # filler rate in percent
@@ -220,6 +224,11 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     # Grammar: text_results returns grammar_score already normalized to 0.0 - 1.0
     grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
+
+    # -------------------------------------------------------
+    # Facial-based metrics
+    # -------------------------------------------------------
+
     # Facial emotions: Averages DeepFace from facial_results["face_emotions"]
     emotions = facial_results.get("face_emotions", {}) or {}
     # normalize missing keys to 0
@@ -233,16 +242,21 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
 
     # the emotion score is a simple weighted combination of positive vs negative emotions, normalized to 0..1
     positive = happy + neutral + 0.5 * surprise
-    negative = angry + disgust + fear + sad
-    raw_emotion_score = positive - negative
-
+    negative = angry + disgust + 0.8 * fear + 0.9 * sad
+    raw_emotion_score = positive / (positive + negative) * 100.0 if (positive + negative) > 0 else 0.0
     # ensure emotion score is between 0 and 100 before normalizing to 0..1
     emotion_pct = max(0.0, min(raw_emotion_score, 100.0))
     emotion_score = emotion_pct / 100.0
 
+
     # Eye contact: facial_results provides a 0..1 score from the analyzer
     eye_contact_raw = facial_results.get("eye_contact_score", 0.0) or 0.0
     eye_contact_score = min(max(float(eye_contact_raw), 0.0), 1.0)
+
+
+    # -------------------------------------------------------
+    # Energy-based metrics
+    # -------------------------------------------------------
 
     # Energy: use average / max to compute relative energy percentage
     energy_stats = audio_results.get("energy_stats", {}) or {}
@@ -253,6 +267,10 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     else:
         energy_pct = 0.0
     energy_score = min(max(energy_pct / 100.0, 0.0), 1.0)
+
+    # -------------------------------------------------------
+    # Combine metrics into total score using weights
+    # -------------------------------------------------------
 
     # Compute weighted total_score (weights expected 0..1)
     try:

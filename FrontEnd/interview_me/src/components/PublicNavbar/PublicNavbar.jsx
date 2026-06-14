@@ -12,8 +12,8 @@ import polygon1 from "../../assets/polygon.svg";
 
 const NAV_ITEMS = [
   { label: "Home",         href: "/"       },
-  { label: "How it works", href: "#how"    },
-  { label: "Products",     href: "#products", hasDropdown: true },
+  { label: "How it works", href: "how-it-works"    },
+  { label: "Products",     href: "/", hasDropdown: true },
 ];
 
 const PublicNavbar = ({ activePage = "" }) => {
@@ -34,7 +34,7 @@ const PublicNavbar = ({ activePage = "" }) => {
       {/* Desktop Nav */}
       <nav className="hidden md:flex items-center gap-8" aria-label="Primary navigation">
         {NAV_ITEMS.map((item) => (
-          <div key={item.label} className="relative flex flex-col items-center">
+          <div key={item.label} className="relative flex flex items-center gap-1">
             <Link
               to={item.href}
               aria-current={activePage === item.label ? "page" : undefined}
