@@ -11,7 +11,6 @@ import RecruiterReport from "./pages/RecruiterReport/RecruiterReport";
 import ProcessVideoPage from "./pages/ProcessVideoPage";
 import SignInPage from "./pages/SignInPage";
 import { SignUp } from "./pages/SignUp/SignUp";
-import CandidateDashboard from "./pages/CandidateDashboard/CandidateDashboard";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuth, isLoading } = useAuth();
@@ -29,21 +28,25 @@ const ProtectedRoute = ({ children }) => {
 
 const AppRoutes = () => (
   <Routes>
+    // Public routes
     <Route path="/" element={<HomePage />} />
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/signup" element={<SignUp />} />
     <Route path="/how-it-works" element={<HowItWorksPage />} />
-    <Route path="/history" element={<CandidateHistoryPage />} />
-    <Route path="/report/:id" element={<CandidateReportPage />} />
-    <Route path="/process-video" element={<ProcessVideoPage />} />
-    <Route
-      path="/dashboard"
-      element={
-        <ProtectedRoute>
-          <CandidateDashboard />
-        </ProtectedRoute>
-      }
-    />
+
+    // Protected routes
+    <Route 
+      path="/history" 
+      element={<ProtectedRoute><CandidateHistoryPage /></ProtectedRoute>} />
+    
+    <Route 
+      path="/report" 
+      element={<ProtectedRoute><CandidateReportPage /></ProtectedRoute>} />
+    
+    <Route 
+      path="/process-video" 
+      element={<ProtectedRoute><ProcessVideoPage /></ProtectedRoute>} />
+
     <Route
       path="/recruiter-history"
       element={

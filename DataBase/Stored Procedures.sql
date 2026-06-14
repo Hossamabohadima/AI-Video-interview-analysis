@@ -34,7 +34,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION compare_reports_sp(v1 INT, v2 INT)
+CREATE OR REPLACE FUNCTION compare_reports_sp(p_video_ids INT[])
 RETURNS TABLE(
     res_videoid INT,
     res_fillers_score DECIMAL,
@@ -57,7 +57,8 @@ BEGIN
         vs.grammar_score::DECIMAL,
         vs.total_score::DECIMAL
     FROM videoScore vs
-    WHERE vs.videoid = v1 OR vs.videoid = v2;
+    WHERE vs.videoid = ANY(p_video_ids)
+    ORDER BY array_position(p_video_ids, vs.videoid);
 END;
 $$ LANGUAGE plpgsql;
 

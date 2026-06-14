@@ -1,17 +1,19 @@
 import { useState, useEffect, useMemo, useId } from "react";
+import { useNavigate } from "react-router-dom";
 
 import DashboardSidebar from "../../components/DashboardSidebar/DashboardSidebar";
 import DashboardHeader  from "../../components/DashboardHeader/DashboardHeader";
-import Pagination       from "../../components/UI/Pagination";
+import Pagination       from "../../components/ui/Pagination";
 
 import useMobileMenu    from "../../hooks/useMobileMenu";
 import usePagination    from "../../hooks/usePagination";
 import { useAuth }      from "../../context/AuthContext";
 import { getBatches }   from "../../services/api";
 
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+
 const TABLE_HEADERS = [
-  "Applied Role", "Batch Size", "Date",
-  "Passed", "Avg. Score", "Top Score", "Action",
+  "Batch", "Candidates", "Date", "Status", "Avg. Score", "Top Score", "Action",
 ];
 
 const SortIcon = () => (
@@ -20,28 +22,44 @@ const SortIcon = () => (
   </svg>
 );
 
+const StatusBadge = ({ status }) => {
+  const styles = {
+    DONE:    "bg-teal-50 text-[#009986]",
+    PENDING: "bg-yellow-50 text-yellow-600",
+    FAILED:  "bg-red-50 text-red-500",
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${styles[status] || "bg-gray-100 text-gray-500"}`}>
+      {status}
+    </span>
+  );
+};
+
 const sortBatches = (batches, sortBy) => {
   const copy = [...batches];
   switch (sortBy) {
     case "newest":     return copy.sort((a, b) => new Date(b.date.replace(/\//g, "-")) - new Date(a.date.replace(/\//g, "-")));
     case "oldest":     return copy.sort((a, b) => new Date(a.date.replace(/\//g, "-")) - new Date(b.date.replace(/\//g, "-")));
-    case "role":       return copy.sort((a, b) => a.role.localeCompare(b.role));
     case "score-high": return copy.sort((a, b) => b.avgScore - a.avgScore);
     case "score-low":  return copy.sort((a, b) => a.avgScore - b.avgScore);
+    case "count-high": return copy.sort((a, b) => b.count - a.count);
     default:           return copy;
   }
 };
 
+// ── PAGE ──────────────────────────────────────────────────────────────────────
+
 export const RecruiterHistory = () => {
   const { user }                  = useAuth();
   const { isOpen, toggle, close } = useMobileMenu();
-  const innerSearchId             = useId();
+  const navigate                  = useNavigate();
+  const searchId                  = useId();
   const sortSelectorId            = useId();
 
   const [batches,    setBatches]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
-  const [roleSearch, setRoleSearch] = useState("");
+  const [search,     setSearch]     = useState("");
   const [sortBy,     setSortBy]     = useState("default");
 
   useEffect(() => {
@@ -58,22 +76,28 @@ export const RecruiterHistory = () => {
     fetchData();
   }, []);
 
-  // Filter → Sort → Paginate
+  // Filter by candidate names in batch
   const filtered = useMemo(() => {
-    const q = roleSearch.trim().toLowerCase();
-    return q ? batches.filter((b) => b.role.toLowerCase().includes(q)) : batches;
-  }, [batches, roleSearch]);
+    const q = search.trim().toLowerCase();
+    if (!q) return batches;
+    return batches.filter((b) =>
+      b.videoNames.some((name) => name.toLowerCase().includes(q)) ||
+      b.date.includes(q)
+    );
+  }, [batches, search]);
 
   const sorted = useMemo(() => sortBatches(filtered, sortBy), [filtered, sortBy]);
 
-  const { paginated, currentPage, totalPages, hasNext, hasPrev, next, prev, goTo, resetPage } =
-    usePagination(sorted, 5);
+  const {
+    paginated, currentPage, totalPages,
+    hasNext, hasPrev, next, prev, goTo, resetPage,
+  } = usePagination(sorted, 5);
 
-  const handleRoleSearch = (val) => { setRoleSearch(val); resetPage(); };
-  const handleSort       = (val) => { setSortBy(val);     resetPage(); };
+  const handleSearch = (val) => { setSearch(val); resetPage(); };
+  const handleSort   = (val) => { setSortBy(val);  resetPage(); };
 
   const headerUser = user
-    ? { name: user.name, role: user.role, initials: user.initials }
+    ? { name: user.name, role: user.roleLabel || user.role, initials: user.initials }
     : { name: "Sarah Ahmed", role: "Recruiter Admin", initials: "SA" };
 
   return (
@@ -89,38 +113,41 @@ export const RecruiterHistory = () => {
             <h1 id="history-heading" className="text-2xl md:text-3xl font-bold text-[#009986]">
               Reports History
             </h1>
+            <p className="text-sm text-gray-400 mt-1">
+              Each row represents one upload batch. Click View Report to see all candidates ranked.
+            </p>
           </section>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 rounded-2xl px-6 py-4 text-sm font-medium">
+            <div className="bg-red-50 border border-red-200 text-red-600 rounded-2xl px-6 py-4 text-sm font-medium" role="alert">
               {error}
             </div>
           )}
 
-          <section className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col" aria-label="Reports list">
+          <section className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col">
 
             {/* Filter toolbar */}
             <div className="p-4 md:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <form className="relative w-full sm:max-w-xs" role="search" aria-label="Search by role">
-                <label htmlFor={innerSearchId} className="sr-only">Search by Role Name</label>
+              <form className="relative w-full sm:max-w-xs" role="search">
+                <label htmlFor={searchId} className="sr-only">Search batches</label>
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
                 <input
-                  id={innerSearchId}
+                  id={searchId}
                   type="search"
-                  value={roleSearch}
-                  onChange={(e) => handleRoleSearch(e.target.value)}
-                  placeholder="Search by Role Name"
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search by candidate name or date"
                   className="w-full h-[37px] bg-gray-50 rounded-xl pl-10 pr-4 text-xs border border-gray-200 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#009986] focus:border-[#009986]"
                 />
               </form>
 
               <div className="relative inline-flex items-center gap-2 bg-white border border-gray-200 rounded-lg h-[37px] px-3 hover:border-gray-300 transition-colors self-end sm:self-auto">
                 <SortIcon />
-                <label htmlFor={sortSelectorId} className="sr-only">Sort reports</label>
+                <label htmlFor={sortSelectorId} className="sr-only">Sort batches</label>
                 <select
                   id={sortSelectorId}
                   value={sortBy}
@@ -130,9 +157,9 @@ export const RecruiterHistory = () => {
                   <option value="default">Sort by</option>
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
-                  <option value="role">Role (A–Z)</option>
                   <option value="score-high">Score (High–Low)</option>
                   <option value="score-low">Score (Low–High)</option>
+                  <option value="count-high">Most Candidates</option>
                 </select>
               </div>
             </div>
@@ -146,7 +173,7 @@ export const RecruiterHistory = () => {
                   ))}
                 </div>
               ) : (
-                <table className="w-full min-w-[850px] text-left border-collapse">
+                <table className="w-full min-w-[750px] text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       {TABLE_HEADERS.map((h) => (
@@ -157,28 +184,59 @@ export const RecruiterHistory = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {paginated.length > 0 ? paginated.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-6 font-medium text-sm text-gray-900">{row.role}</td>
-                        <td className="py-4 px-6 text-sm text-gray-600 text-center">{row.batchSize}</td>
-                        <td className="py-4 px-6 text-sm text-gray-600 text-center">
-                          <time dateTime={row.date.replace(/\//g, "-")}>{row.date}</time>
+                    {paginated.length > 0 ? paginated.map((batch) => (
+                      <tr key={batch.batchKey} className="hover:bg-gray-50 transition-colors">
+
+                        {/* Batch — show date + time + candidate names preview */}
+                        <td className="py-4 px-6 text-left">
+                          <div className="font-medium text-sm text-gray-900">{batch.date} {batch.time}</div>
+                          <div className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">
+                            {batch.videoNames.slice(0, 3).join(", ")}
+                            {batch.videoNames.length > 3 && ` +${batch.videoNames.length - 3} more`}
+                          </div>
                         </td>
-                        <td className="py-4 px-6 text-sm text-gray-600 text-center">{row.passed}</td>
+
+                        {/* Candidate count */}
+                        <td className="py-4 px-6 text-sm text-gray-600 text-center font-medium">
+                          {batch.count}
+                        </td>
+
+                        {/* Date */}
+                        <td className="py-4 px-6 text-sm text-gray-600 text-center">
+                          {batch.date}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-4 px-6 text-center">
+                          <StatusBadge status={batch.status} />
+                        </td>
+
+                        {/* Avg Score */}
                         <td className="py-4 px-6 text-sm text-center">
                           <div className="flex items-center justify-center gap-3">
-                            <span className="min-w-[32px] font-medium">{row.avgScore}%</span>
+                            <span className="min-w-[32px] font-medium">{batch.avgScore}%</span>
                             <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden" aria-hidden="true">
-                              <div className="h-full bg-[#009986] rounded-full transition-all duration-500" style={{ width: `${row.avgScore}%` }} />
+                              <div
+                                className="h-full bg-[#009986] rounded-full transition-all duration-500"
+                                style={{ width: `${batch.avgScore}%` }}
+                              />
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-6 text-sm font-bold text-center text-[#33b278]">{row.topScore}</td>
+
+                        {/* Top Score */}
+                        <td className="py-4 px-6 text-sm font-bold text-center text-[#009986]">
+                          {batch.topScore}
+                        </td>
+
+                        {/* Action */}
                         <td className="py-4 px-6 text-center">
                           <button
                             type="button"
-                            className="h-8 px-4 rounded-full border border-gray-200 bg-white text-sm font-medium text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            aria-label={`View report for ${row.role}`}
+                            onClick={() => navigate(`/recruiter-report?ids=${batch.idsParam}`)}
+                            disabled={batch.status !== "DONE"}
+                            className="h-8 px-4 rounded-full border border-gray-200 bg-white text-sm font-medium text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                            aria-label={`View report for batch on ${batch.date}`}
                           >
                             View Report
                           </button>
@@ -187,7 +245,10 @@ export const RecruiterHistory = () => {
                     )) : (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">
-                          No reports found matching &quot;{roleSearch}&quot;
+                          {search
+                            ? `No batches found matching "${search}"`
+                            : "No reports yet. Upload videos to get started."
+                          }
                         </td>
                       </tr>
                     )}
@@ -205,15 +266,17 @@ export const RecruiterHistory = () => {
                 onNext={next}
                 onPrev={prev}
                 onGoTo={goTo}
-                summary={`Page ${currentPage} of ${totalPages} · ${sorted.length} result${sorted.length !== 1 ? "s" : ""}`}
-                label="Reports pagination"
+                summary={`Page ${currentPage} of ${totalPages} · ${sorted.length} batch${sorted.length !== 1 ? "es" : ""}`}
+                label="Batches pagination"
               />
             )}
           </section>
         </main>
 
         <footer className="py-5 px-8 text-center shrink-0">
-          <p className="text-xs text-gray-400">&copy; {new Date().getFullYear()} Interview Me. All rights reserved.</p>
+          <p className="text-xs text-gray-400">
+            &copy; {new Date().getFullYear()} Interview Me. All rights reserved.
+          </p>
         </footer>
       </div>
     </div>
