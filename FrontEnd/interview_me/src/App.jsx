@@ -49,11 +49,19 @@ const AppRoutes = () => (
 
     <Route
       path="/recruiter-history"
-      element={<ProtectedRoute><RecruiterHistory /></ProtectedRoute>}
+      element={
+        <ProtectedRoute>
+          <RecruiterHistory />
+        </ProtectedRoute>
+      }
     />
     <Route
       path="/recruiter-report"
-      element={<ProtectedRoute><RecruiterReport /></ProtectedRoute>}
+      element={
+        <ProtectedRoute>
+          <RecruiterReport />
+        </ProtectedRoute>
+      }
     />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

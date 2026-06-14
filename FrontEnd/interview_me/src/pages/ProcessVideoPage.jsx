@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function SidebarItem({ active = false, icon, label, to = "#" }) {
   return (
@@ -165,41 +165,42 @@ function SliderRow({ label, value, onChange }) {
   );
 }
 
-function AnalysisWeightsCard({ weights, setWeights, threshold, setThreshold }) {
+function AnalysisWeightsCard({
+  weights,
+  setWeights,
+  threshold,
+  setThreshold,
+  isRecruiter,
+}) {
   const total = Object.values(weights).reduce((sum, val) => sum + val, 0);
 
   const updateWeight = (key, nextValue) => {
     const current = weights[key];
     const diff = nextValue - current;
-
     const otherKeys = Object.keys(weights).filter((k) => k !== key);
-    let remaining = otherKeys.reduce((sum, k) => sum + weights[k], 0);
+    const updated = { ...weights };
 
-    if (diff > 0 && remaining === 0) return;
+    updated[key] = nextValue;
 
-    let updated = { ...weights, [key]: nextValue };
-
-    if (diff !== 0) {
-      let toAdjust = diff;
+    if (diff > 0) {
+      let remainingToReduce = diff;
 
       for (const otherKey of otherKeys) {
-        if (toAdjust <= 0) break;
+        if (remainingToReduce <= 0) break;
         const reducible = updated[otherKey];
-        const reduction = Math.min(reducible, toAdjust);
+        const reduction = Math.min(reducible, remainingToReduce);
         updated[otherKey] -= reduction;
-        toAdjust -= reduction;
+        remainingToReduce -= reduction;
       }
 
-      if (toAdjust > 0) {
-        updated[key] = nextValue - toAdjust;
+      if (remainingToReduce > 0) {
+        updated[key] = nextValue - remainingToReduce;
       }
-    }
-
-    const newTotal = Object.values(updated).reduce((sum, v) => sum + v, 0);
-
-    if (newTotal < 100) {
-      const firstOther = otherKeys[0];
-      if (firstOther) updated[firstOther] += 100 - newTotal;
+    } else if (diff < 0) {
+      const increaseAmount = Math.abs(diff);
+      if (otherKeys.length > 0) {
+        updated[otherKeys[0]] += increaseAmount;
+      }
     }
 
     setWeights(updated);
@@ -218,29 +219,34 @@ function AnalysisWeightsCard({ weights, setWeights, threshold, setThreshold }) {
 
       <div className="space-y-5">
         <SliderRow
-          label="Lang & Clarity"
-          value={weights.langClarity}
-          onChange={(v) => updateWeight("langClarity", v)}
+          label="Fillers Usage"
+          value={weights.fillers}
+          onChange={(v) => updateWeight("fillers", v)}
         />
         <SliderRow
-          label="Speech Fluency"
-          value={weights.speechFluency}
-          onChange={(v) => updateWeight("speechFluency", v)}
+          label="Pause Duration"
+          value={weights.pause}
+          onChange={(v) => updateWeight("pause", v)}
         />
         <SliderRow
-          label="Vocal Expressiveness"
-          value={weights.vocalExpressiveness}
-          onChange={(v) => updateWeight("vocalExpressiveness", v)}
+          label="Emotion Intensity"
+          value={weights.emotion}
+          onChange={(v) => updateWeight("emotion", v)}
         />
         <SliderRow
-          label="Visual Engagement"
-          value={weights.visualEngagement}
-          onChange={(v) => updateWeight("visualEngagement", v)}
+          label="Energy Level"
+          value={weights.energy}
+          onChange={(v) => updateWeight("energy", v)}
         />
         <SliderRow
-          label="Facial Positivity"
-          value={weights.facialPositivity}
-          onChange={(v) => updateWeight("facialPositivity", v)}
+          label="Eye Contact"
+          value={weights.eyeContact}
+          onChange={(v) => updateWeight("eyeContact", v)}
+        />
+        <SliderRow
+          label="Grammar Accuracy"
+          value={weights.grammar}
+          onChange={(v) => updateWeight("grammar", v)}
         />
       </div>
 
@@ -250,32 +256,49 @@ function AnalysisWeightsCard({ weights, setWeights, threshold, setThreshold }) {
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-3">
-        <span className="text-[14px] text-[#7C7C7C]">Threshold</span>
-        <input
-          type="number"
-          min="0"
-          max="100"
-          value={threshold}
-          onChange={(e) => {
-            let v = Number(e.target.value);
-            if (Number.isNaN(v)) v = 0;
-            if (v < 0) v = 0;
-            if (v > 100) v = 100;
-            setThreshold(v);
-          }}
-          className="h-[32px] w-[60px] rounded-md border border-[#D1D5DB] bg-[#F5F5F5] px-2 text-center text-[13px] outline-none"
-        />
-      </div>
+      {isRecruiter && (
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <span className="text-[14px] text-[#7C7C7C]">Threshold</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={threshold}
+            onChange={(e) => {
+              let v = Number(e.target.value);
+              if (Number.isNaN(v)) v = 0;
+              if (v < 0) v = 0;
+              if (v > 100) v = 100;
+              setThreshold(v);
+            }}
+            className="h-[32px] w-[60px] rounded-md border border-[#D1D5DB] bg-[#F5F5F5] px-2 text-center text-[13px] outline-none"
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function UploadDropzone({ onFilesAdded, isDragging, setIsDragging, inputRef }) {
+function UploadDropzone({
+  onFilesAdded,
+  isDragging,
+  setIsDragging,
+  inputRef,
+  isRecruiter,
+}) {
   const handleFiles = (fileList) => {
-    const files = Array.from(fileList || []);
-    const videoFiles = files.filter((file) => file.type.startsWith("video/"));
-    if (videoFiles.length) onFilesAdded(videoFiles);
+    const allFiles = Array.from(fileList || []);
+    const videoFiles = allFiles.filter((file) =>
+      file.type.startsWith("video/"),
+    );
+
+    if (!videoFiles.length) return;
+
+    if (isRecruiter) {
+      onFilesAdded(videoFiles);
+    } else {
+      onFilesAdded([videoFiles[0]]);
+    }
   };
 
   return (
@@ -301,7 +324,7 @@ function UploadDropzone({ onFilesAdded, isDragging, setIsDragging, inputRef }) {
         ref={inputRef}
         type="file"
         accept="video/*"
-        multiple
+        multiple={isRecruiter}
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
       />
@@ -316,9 +339,17 @@ function UploadDropzone({ onFilesAdded, isDragging, setIsDragging, inputRef }) {
       <p className="mt-3 text-[13px] text-[#A1A1AA]">
         Upload MP4, MOV, or WEBM files.
       </p>
-      <p className="text-[13px] text-[#A1A1AA]">
-        You can upload up to 300 videos at once for bulk processing.
-      </p>
+
+      {isRecruiter ? (
+        <p className="text-[13px] text-[#A1A1AA]">
+          You can upload up to 300 videos at once for bulk processing.
+        </p>
+      ) : (
+        <p className="text-[13px] text-[#A1A1AA]">
+          You can upload only one video.
+        </p>
+      )}
+
       <p className="mt-3 text-[12px] font-medium text-[#0FA99D]">
         Click here to browse files
       </p>
@@ -340,7 +371,11 @@ function UploadedFileRow({ file, onRemove }) {
 
       <div className="ml-4 flex items-center gap-4">
         <SmallUploadStatus />
-        <button className="text-[#D1D5DB]" onClick={() => onRemove(file.id)}>
+        <button
+          type="button"
+          className="text-[#D1D5DB]"
+          onClick={() => onRemove(file.id)}
+        >
           ✕
         </button>
       </div>
@@ -361,6 +396,7 @@ function ReadyToProcessCard({ files, clearAllFiles, removeFile }) {
           </span>
         </div>
         <button
+          type="button"
           className="text-[12px] text-[#7C7C7C]"
           onClick={clearAllFiles}
           disabled={!files.length}
@@ -396,34 +432,58 @@ function ReadyToProcessCard({ files, clearAllFiles, removeFile }) {
   );
 }
 
-function StartProcessingButton({ disabled }) {
+function StartProcessingButton({ disabled, onClick, loading }) {
   return (
     <button
-      disabled={disabled}
+      type="button"
+      disabled={disabled || loading}
+      onClick={onClick}
       className={`flex h-[58px] w-full items-center justify-center gap-3 rounded-[14px] text-[18px] font-bold text-white shadow-sm ${
-        disabled
+        disabled || loading
           ? "cursor-not-allowed bg-[#9FDCD5]"
           : "bg-[#0FA99D] hover:bg-[#0c8f85]"
       }`}
     >
-      <span className="text-[16px]">▶</span>
-      Start Processing
+      <span className="text-[16px]">{loading ? "⏳" : "▶"}</span>
+      {loading ? "Processing..." : "Start Processing"}
     </button>
   );
 }
 
 function ProcessVideoPage() {
+  const navigate = useNavigate();
+
   const [roleName, setRoleName] = useState("");
   const [threshold, setThreshold] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
 
+  const role = localStorage.getItem("role") || "";
+  const name = localStorage.getItem("name") || "";
+  const token = localStorage.getItem("access_token") || "";
+  console.log("User info:", { role, name, token });
+  const trimmedName = name.trim();
+
+  const profileChar =
+    trimmedName.split(" ").length >= 2
+      ? trimmedName
+          .split(" ")
+          .slice(0, 2)
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+      : trimmedName.slice(0, 2).toUpperCase();
+
+  const isRecruiter = role === "RECRUITER";
+
   const [weights, setWeights] = useState({
-    langClarity: 30,
-    speechFluency: 30,
-    vocalExpressiveness: 20,
-    visualEngagement: 10,
-    facialPositivity: 10,
+    fillers: 30,
+    pause: 20,
+    emotion: 20,
+    energy: 10,
+    eyeContact: 10,
+    grammar: 10,
   });
 
   const [files, setFiles] = useState([]);
@@ -431,23 +491,88 @@ function ProcessVideoPage() {
   const onFilesAdded = (newFiles) => {
     const prepared = newFiles.map((file, index) => ({
       id: `${file.name}-${file.size}-${file.lastModified}-${Date.now()}-${index}`,
+      // strip extension for video_names field  e.g. "abubaker.mp4" → "abubaker"
       name: file.name,
+      baseName: file.name.replace(/\.[^/.]+$/, ""),
       raw: file,
     }));
 
-    setFiles((prev) => [...prev, ...prepared]);
+    if (isRecruiter) {
+      setFiles((prev) => [...prev, ...prepared]);
+    } else {
+      // user: always replace with the single selected file
+      setFiles(prepared.slice(0, 1));
+    }
   };
 
   const clearAllFiles = () => setFiles([]);
 
-  const removeFile = (id) => {
+  const removeFile = (id) =>
     setFiles((prev) => prev.filter((file) => file.id !== id));
-  };
 
   const totalWeight = useMemo(
     () => Object.values(weights).reduce((sum, value) => sum + value, 0),
     [weights],
   );
+
+  const handleStartProcessing = async () => {
+    if (!files.length || totalWeight !== 100) return;
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+
+      // ── files & video_names ──────────────────────────────────────────────
+      // The API expects repeated fields:
+      //   files=<blob>  video_names=<name>  (one pair per video)
+      files.forEach((file) => {
+        formData.append("files", file.raw);
+        formData.append("video_names", file.baseName);
+      });
+
+      // ── weights (convert % → decimal, e.g. 30 → 0.3) ────────────────────
+      formData.append("fillers_weight", (weights.fillers / 100).toFixed(2));
+      formData.append("pause_rate_weight", (weights.pause / 100).toFixed(2));
+      formData.append("emotion_weight", (weights.emotion / 100).toFixed(2));
+      formData.append("energy_weight", (weights.energy / 100).toFixed(2));
+      formData.append(
+        "eye_contact_weight",
+        (weights.eyeContact / 100).toFixed(2),
+      );
+      formData.append("grammar_weight", (weights.grammar / 100).toFixed(2));
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/users/videos/upload",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // NOTE: do NOT set Content-Type manually when using FormData
+            // the browser sets it automatically with the correct boundary
+          },
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to upload videos");
+      }
+
+      const data = await response.json();
+
+      // persist in localStorage in case the report page needs it after refresh
+      localStorage.setItem("candidateReportData", JSON.stringify(data));
+
+      navigate("/history", { state: { reportData: data } });
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert(`Failed to process video(s).\n${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-[#E8E6E2]">
@@ -478,7 +603,7 @@ function ProcessVideoPage() {
             Interview me
           </div>
 
-          <div className="relative w-[340px]">
+          {/* <div className="relative w-[340px]">
             <input
               className="h-[36px] w-full rounded-full bg-[#EFEFEF] pl-10 pr-4 text-[11px] text-gray-700 outline-none placeholder:text-[#9CA3AF]"
               placeholder="Search candidates, reports ..etc"
@@ -486,19 +611,25 @@ function ProcessVideoPage() {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[#9CA3AF]">
               🔍
             </span>
-          </div>
+          </div> */}
         </div>
 
         <div className="flex items-center gap-4">
           <div className="border-r border-[#E5E7EB] pr-3 text-right">
             <div className="text-[12px] font-semibold text-[#374151]">
-              Sarah Ahmed
+              {name}
             </div>
-            <div className="text-[10px] text-[#9CA3AF]">Recruiter Admin</div>
+            <div className="text-[10px] text-[#9CA3AF]">
+              {isRecruiter ? "Recruiter Admin" : "User"}
+            </div>
           </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D]">
-            SA
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/history")}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
+          >
+            {profileChar || "NA"}
+          </button>
         </div>
       </header>
 
@@ -521,9 +652,12 @@ function ProcessVideoPage() {
             <h1 className="text-[24px] font-bold text-[#0FA99D]">
               New Processing
             </h1>
-            <p className="mt-1 text-[14px] text-[#7C7C7C]">
-              Upload candidate videos and configure AI analysis parameters.
-            </p>
+
+            {isRecruiter && (
+              <p className="mt-1 text-[14px] text-[#7C7C7C]">
+                Upload candidate videos and configure AI analysis parameters.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-[1fr_1.2fr] gap-6">
@@ -534,6 +668,7 @@ function ProcessVideoPage() {
                 setWeights={setWeights}
                 threshold={threshold}
                 setThreshold={setThreshold}
+                isRecruiter={isRecruiter}
               />
             </div>
 
@@ -543,6 +678,7 @@ function ProcessVideoPage() {
                 isDragging={isDragging}
                 setIsDragging={setIsDragging}
                 inputRef={inputRef}
+                isRecruiter={isRecruiter}
               />
               <ReadyToProcessCard
                 files={files}
@@ -551,6 +687,8 @@ function ProcessVideoPage() {
               />
               <StartProcessingButton
                 disabled={!files.length || totalWeight !== 100}
+                onClick={handleStartProcessing}
+                loading={loading}
               />
             </div>
           </div>
