@@ -19,3 +19,4 @@ audio/
 videos/
 **/audio/**
 **/videos/**
+.env

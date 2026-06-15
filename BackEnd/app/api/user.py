@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends
+from ..schemas.Threshold import Threshold
 from ..schemas.video import MetricWeights, VideoComparisonRequest
+from decimal import Decimal
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
@@ -31,18 +33,10 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/reports/compare", status_code=status.HTTP_200_OK)
-async def compare_user_reports(
-    payload: VideoComparisonRequest,
-    current_user: dict = Depends(get_current_user)
-):
+async def compare_user_reports(request: VideoComparisonRequest, current_user: dict = Depends(get_current_user)):
     try:
-        result = await compare_reports(payload.video_ids, current_user["user_id"])
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No videos found for comparison"
-            )
-        return {"comparison": result}
+        result = await compare_reports(request.video_ids, current_user["user_id"])
+        return result
     except HTTPException as e:
         raise e
     except Exception as e:
