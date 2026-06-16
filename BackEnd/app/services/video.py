@@ -1,3 +1,6 @@
+import asyncio
+from openai import AsyncOpenAI
+from ..services.report import video_report
 from ..models.IAnalysisModel import AnalysisInput
 from ..schemas.video import MetricWeights, Scores
 from ..models.facial_analysis import FacialAnalysis
@@ -12,8 +15,6 @@ import uuid
 import os
 import shutil
 import json
-import decimal
-import psycopg2.extras
 import whisper
 import subprocess
 import mediapipe as mp
@@ -254,9 +255,7 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     eye_contact_score = min(max(float(eye_contact_raw), 0.0), 1.0)
 
 
-    # -------------------------------------------------------
-    # Energy-based metrics
-    # -------------------------------------------------------
+
 
     # Energy: use average / max to compute relative energy percentage
     energy_stats = audio_results.get("energy_stats", {}) or {}
@@ -268,9 +267,6 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         energy_pct = 0.0
     energy_score = min(max(energy_pct / 100.0, 0.0), 1.0)
 
-    # -------------------------------------------------------
-    # Combine metrics into total score using weights
-    # -------------------------------------------------------
 
     # Compute weighted total_score (weights expected 0..1)
     try:
@@ -302,7 +298,7 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         video_id=video_id
     )
 
-def _process_video_sync(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> Scores:
+def _process_video_sync(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) ->  dict:
     if video_path is None:
         file_name = _get_video_filename(video_id)
         if not file_name:
@@ -387,13 +383,26 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
         finally:
             cur.close()
             conn.close()
-
-        return scores
+        Groq_client = AsyncOpenAI(
+    api_key="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",
+    base_url="https://api.groq.com/openai/v1"
+)       
+        report = asyncio.run(video_report(Groq_client, scores, {
+            "text_results": text_results,
+            "facial_results": facial_results,
+            "audio_results": audio_results
+        }))
+        print(f"Report generated for video {video_id}")
+        return {
+            "scores": scores,
+            "report": report
+        }
 
     except Exception as e:
         print(f"Error processing video {video_id}: {e}")
         # Return default scores to prevent crash
-        return Scores(
+        return {
+            "scores": Scores(
             video_id=video_id,
             fillers_score=0.0,
             pause_rate_score=0.0,
@@ -402,7 +411,9 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
             eye_contact_score=0.0,
             grammar_score=0.0,
             total_score=0.0,
-        )
+        ),
+            "report": f"Error processing video {video_id}: {e}"
+        }
     finally:
         if audio_path and os.path.exists(audio_path):
             try:
@@ -487,14 +498,14 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
             raise ValueError("Video standardization failed")
 
         # Run video processing in thread pool (CPU-intensive)
-        scores = await run_in_threadpool(
+        result = await run_in_threadpool(
             _process_video_sync,
             video_id,
             weights or MetricWeights(),
             output_path
         )
         
-        if scores is None:
+        if result["scores"] is None:
             _update_video_status(video_id, "FAILED")
             raise RuntimeError(f"Failed to process video {video_id}")
 
@@ -504,8 +515,9 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
             "video_id": video_id,
             "file_name": unique_name,
             "duration": duration,
+            "report": result["report"],
             "status": "DONE",
-            "scores": scores
+            "scores": result["scores"]
         }
 
     except Exception as e:

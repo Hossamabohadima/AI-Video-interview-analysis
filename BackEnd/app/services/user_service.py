@@ -2,10 +2,12 @@ from typing import List
 import json
 from fastapi import HTTPException
 from decimal import Decimal
+from openai import AsyncOpenAI
 import psycopg2
 import psycopg2.extras
 from ..db import get_db_connection
 from ..schemas.video import MetricWeights
+from ..services.report import video_report, compare_between_reports
 
 async def get_reports(user_id: int):
     """Fetch all video reports for a user."""
@@ -29,7 +31,7 @@ async def compare_reports(video_ids: list[int], user_id: int):
 
     conn = get_db_connection()
     cur = conn.cursor()
-
+    print(f"Comparing videos: {video_ids} for user_id: {user_id}")
     try:
         cur.execute(
             "SELECT get_video_score_and_analysis(%s, %s)",
@@ -45,7 +47,12 @@ async def compare_reports(video_ids: list[int], user_id: int):
                 status_code=404,
                 detail="No videos found for comparison"
             )
-        return result
+        Groq_client = AsyncOpenAI(
+            api_key="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",
+            base_url="https://api.groq.com/openai/v1"
+        )
+        report = await compare_between_reports(Groq_client, result)
+        return result, report
     except HTTPException:
         raise
     except Exception as e:
