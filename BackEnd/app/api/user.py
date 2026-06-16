@@ -1,12 +1,10 @@
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends, Body
-from ..schemas.Threshold import Threshold
+from streamlit import json
 from ..schemas.video import MetricWeights
-from decimal import Decimal
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
-    set_weights, 
     set_threshold_score,
 )
 from ..services.video import handle_uploaded_video
@@ -39,15 +37,38 @@ async def compare_user_reports(
 ):
     try:
         if video_ids is None or len(video_ids) < 2:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Provide at least two video IDs for comparison"
-                )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide at least two video IDs for comparison"
+            )
 
-        result = await compare_reports(video_ids)
-        found_ids = {row["res_videoid"] for row in result}
+        result, report = await compare_reports(video_ids, current_user["user_id"])
+        print(f"Comparison result: {result}")
+        print(f"Generated report: {report}")
+        # 🚀 FIX 1: If result is a JSON string, deserialize it into a list/dict first
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except Exception:
+                result = {}
+
+        found_ids = set()
+
+        # 2. Extract IDs safely from the dictionary structure
+        if isinstance(result, dict):
+            # We check 'scores', but you could also use 'analysis'
+            scores_list = result.get("scores", [])
+            if isinstance(scores_list, list):
+                found_ids = {
+                    row["videoID"]
+                    for row in scores_list 
+                    if isinstance(row, dict) and "videoID" in row
+                }
+
+        # 3. Check for missing IDs
         requested_ids = list(dict.fromkeys(video_ids))
         missing_ids = [vid for vid in requested_ids if vid not in found_ids]
+
         if missing_ids:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -56,13 +77,14 @@ async def compare_user_reports(
                     "missing_video_ids": missing_ids
                 }
             )
-
-        return {"comparison": result}
+        return {
+            "comparison": result, 
+            "report": report
+        }
+        
     except HTTPException as e:
-        # Re-raise HTTPExceptions so we see the actual 404 or 500 detail
         raise e
     except Exception as e:
-        # Log the real error to your terminal!
         print(f"CRITICAL ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

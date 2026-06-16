@@ -1,4 +1,21 @@
 import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+function SidebarItem({ active = false, icon, label, to = "#" }) {
+  return (
+    <Link
+      to={to}
+      className={`flex w-full items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium ${
+        active ? "bg-[#E8FBF7] text-[#0FA99D]" : "text-[#0FA99D]"
+      }`}
+    >
+      <span className="inline-flex h-6 w-6 items-center justify-center">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </Link>
+  );
+}
 
 function ScoreRingCard({ title, score, subtitle }) {
   const size = 40;
@@ -56,6 +73,44 @@ function ScoreRingCard({ title, score, subtitle }) {
 
       {subtitle && <div className="text-[7px] text-[#C0C0C0]">{subtitle}</div>}
     </div>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#0FA99D"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 shrink-0"
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function AnalyzeIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="-3 0 30 24"
+      fill="none"
+      stroke="#0FA99D"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5 shrink-0"
+    >
+      <path d="M20 16.5A4.5 4.5 0 0 0 17 8h-1.26A8 8 0 1 0 4 15.25" />
+      <path d="M12 20V11" />
+      <path d="m8.8 14.2 3.2-3.2 3.2 3.2" />
+    </svg>
   );
 }
 
@@ -119,9 +174,15 @@ function ReportCard({ icon, title, subtitle, score, rows, accent = "teal" }) {
 }
 
 function CandidateReportPage() {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
   const { state } = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/signin");
+  };
 
   const session = state?.session;
 
@@ -138,6 +199,22 @@ function CandidateReportPage() {
           .toUpperCase()
       : name.trim().slice(0, 2).toUpperCase();
   const isRecruiter = role === "RECRUITER";
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   if (!session) {
     return (
@@ -180,39 +257,47 @@ function CandidateReportPage() {
               {isRecruiter ? "Recruiter Admin" : "User"}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/history")}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
-          >
-            {profileChar || "NA"}
-          </button>
+          <div ref={profileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((prev) => !prev)}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
+            >
+              {profileChar || "NA"}
+            </button>
+
+            {profileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-[170px] rounded-[14px] border border-[#E5E7EB] bg-white py-2 shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-left text-[14px] font-medium text-[#374151] hover:bg-[#F3F4F6]"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="flex">
         <aside className="min-h-[calc(100vh-72px)] w-[240px] bg-white">
           <nav className="mt-8 flex flex-col gap-2 px-3">
-            <Link
+            {/* <Link
               to="/"
               className="flex items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
             >
               <span>Dashboard</span>
-            </Link>
+            </Link> */}
 
-            <Link
+            <SidebarItem
+              active
+              icon={<AnalyzeIcon />}
+              label="Analyze Interview"
               to="/process-video"
-              className="flex items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
-            >
-              <span>Analyze Interview</span>
-            </Link>
-
-            <Link
-              to="/history"
-              className="flex w-full items-center gap-2 rounded-full bg-[#E8FBF7] px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
-            >
-              <span>History</span>
-            </Link>
+            />
+            <SidebarItem icon={<HistoryIcon />} label="History" to="/history" />
           </nav>
         </aside>
 

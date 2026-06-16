@@ -1,88 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-
-const steps = [
-  {
-    id: "upload-video",
-    circleClassName: "absolute top-[400px] left-[215px] w-[100px] h-[100px]",
-    iconType: "image",
-    iconSrc: "https://c.animaapp.com/zou3Gdv0/img/group-7@2x.png",
-    iconAlt: "Upload video icon",
-    label: <>Upload Video</>,
-    labelClassName:
-      "absolute top-[531px] left-[191px] w-[147px] h-[71px] flex items-center justify-center [font-family:'Inter',Helvetica] font-bold text-[#808080] text-[25px] text-center tracking-[0] leading-[normal]",
-  },
-  {
-    id: "extract-streams",
-    circleClassName:
-      "absolute top-[400px] left-[465px] w-[100px] h-[100px] bg-neutral-200 rounded-[50px] border-2 border-solid border-[#009986] opacity-[0.99]",
-    iconType: "image",
-    iconSrc: "https://c.animaapp.com/zou3Gdv0/img/extraction-icon.svg",
-    iconAlt: "Extraction icon",
-    iconClassName:
-      "absolute top-[416px] left-[481px] w-[67px] h-[67px] aspect-[1]",
-    label: (
-      <>
-        Extract Streams
-        <br />
-        (Audio, Text, Visual )
-      </>
-    ),
-    labelClassName:
-      "top-[531px] left-[387px] w-[259px] h-[71px] absolute [font-family:'Inter',Helvetica] font-bold text-[#808080] text-[25px] text-center tracking-[0] leading-[normal]",
-  },
-  {
-    id: "ai-engine-analysis",
-    circleClassName:
-      "absolute top-[399px] left-[715px] w-[100px] h-[100px] bg-neutral-200 rounded-[50px] border-2 border-solid border-[#009986] opacity-[0.99]",
-    iconType: "image",
-    iconSrc: "https://c.animaapp.com/zou3Gdv0/img/ai-engine-icon.svg",
-    iconAlt: "Ai engine icon",
-    iconClassName:
-      "absolute top-[407px] left-[722px] w-[85px] h-[85px] aspect-[1]",
-    label: (
-      <>
-        Ai Engine
-        <br />
-        Analysis
-      </>
-    ),
-    labelClassName:
-      "top-[531px] left-[700px] w-[130px] h-[71px] absolute [font-family:'Inter',Helvetica] font-bold text-[#808080] text-[25px] text-center tracking-[0] leading-[normal]",
-  },
-  {
-    id: "get-practical-report",
-    circleClassName:
-      "absolute top-[399px] left-[965px] w-[100px] h-[100px] bg-neutral-200 rounded-[50px] border-2 border-solid border-[#009986] opacity-[0.99]",
-    iconType: "image",
-    iconSrc: "https://c.animaapp.com/zou3Gdv0/img/report.svg",
-    iconAlt: "Report",
-    iconClassName:
-      "absolute top-[416px] left-[982px] w-[65px] h-[65px] aspect-[1]",
-    label: <>Get Practical Report</>,
-    labelClassName:
-      "top-[543px] left-[932px] w-[163px] h-[60px] flex items-center justify-center absolute [font-family:'Inter',Helvetica] font-bold text-[#808080] text-[25px] text-center tracking-[0] leading-[normal]",
-  },
-];
-
-const connectorLines = [
-  {
-    id: "line-1",
-    className: "top-[448px] left-[315px] absolute w-[150px] h-0.5",
-  },
-  {
-    id: "line-2",
-    className: "top-[448px] left-[565px] absolute w-[150px] h-0.5",
-  },
-  {
-    id: "line-3",
-    className: "top-[447px] left-[815px] absolute w-[150px] h-0.5",
-  },
-];
+import { Link, useNavigate } from "react-router-dom";
 
 function HowItWorksPage() {
+  const navigate = useNavigate();
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
+
   const productsRef = useRef(null);
+  const closeTimeoutRef = useRef(null);
+
+  const openProductsMenu = () => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    setProductsOpen(true);
+  };
+
+  const closeProductsMenu = () => {
+    closeTimeoutRef.current = setTimeout(() => setProductsOpen(false), 220);
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -90,73 +25,116 @@ function HowItWorksPage() {
         setProductsOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
   }, []);
 
+  const handleAnalyzeInterviewNavigation = () => {
+    const accessToken = localStorage.getItem("access_token");
+
+    if (!accessToken) {
+      navigate("/signup");
+      return;
+    }
+
+    navigate("/process-video");
+  };
+
+  const handleViewReportNavigation = () => {
+    const accessToken = localStorage.getItem("access_token");
+    const role = localStorage.getItem("role");
+
+    if (!accessToken) {
+      navigate("/signup");
+      return;
+    }
+
+    if (role === "RECRUITER") {
+      navigate("/recruiter-history");
+      return;
+    }
+
+    navigate("/history");
+  };
+
+  const navItems = [
+    { label: "Home", href: "/", active: false },
+    { label: "How it works", href: "/how-it-works", active: true },
+  ];
+
   return (
-    <main
-      className="bg-[#e5e4e2] w-full min-w-[1280px] min-h-[859px] relative"
-      data-model-id="15:40"
-    >
-      <header className="absolute top-[37px] left-[30px] right-[30px] flex items-center justify-between z-20">
-        <div className="w-[191px] h-10 flex items-center [font-family:'Pacifico',Helvetica] font-normal text-[#009986] text-[35px] leading-[normal] whitespace-nowrap">
+    <div className="min-h-screen bg-[#e5e4e2] flex flex-col">
+      <header className="w-full px-6 py-4 flex items-center justify-between relative z-30">
+        <span
+          style={{ fontFamily: "Pacifico" }}
+          className="text-[#009986] text-3xl whitespace-nowrap"
+        >
           Interview me
-        </div>
+        </span>
 
-        <nav aria-label="Primary" className="flex items-center gap-[36px]">
-          <Link
-            to="/"
-            className="inline-flex min-w-[62px] items-center justify-center text-[#56606B] text-[25px] font-bold whitespace-nowrap [font-family:'Alegreya_Sans',Helvetica]"
-          >
-            Home
-          </Link>
-
-          <Link
-            to="/how-it-works"
-            aria-current="page"
-            className="inline-flex min-w-[62px] items-center justify-center text-[#56606B] text-[25px] font-bold whitespace-nowrap [font-family:'Alegreya_Sans',Helvetica]"
-          >
-            How it works
-          </Link>
+        <nav className="hidden md:flex items-center gap-8">
+          {navItems.map((item) => (
+            <div key={item.label} className="relative flex items-center gap-1">
+              <Link
+                to={item.href}
+                aria-current={item.active ? "page" : undefined}
+                className={`font-bold text-lg transition-colors ${
+                  item.active
+                    ? "text-[#009986]"
+                    : "text-[#566068] hover:text-[#009986]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            </div>
+          ))}
 
           <div
             ref={productsRef}
-            className="relative inline-flex flex-col items-center"
+            className="relative"
+            onMouseEnter={openProductsMenu}
+            onMouseLeave={closeProductsMenu}
           >
             <button
               type="button"
               onClick={() => setProductsOpen((prev) => !prev)}
-              className="inline-flex flex-col items-center min-w-[90px] focus:outline-none"
+              className={`flex items-center gap-1 font-bold text-lg transition-colors focus:outline-none ${
+                productsOpen
+                  ? "text-[#009986]"
+                  : "text-[#566068] hover:text-[#009986]"
+              }`}
             >
-              <span className="inline-flex items-center justify-center text-[#009986] text-[25px] font-bold whitespace-nowrap [font-family:'Alegreya_Sans',Helvetica]">
-                Products
-              </span>
-
+              <span>Products</span>
               <svg
-                className={`mt-[6px] h-[11px] w-[13px] transition-transform duration-200 ${
+                className={`w-2.5 h-2 transition-transform duration-200 ${
                   productsOpen ? "rotate-180" : ""
                 }`}
                 viewBox="0 0 13 11"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
               >
                 <path
                   d="M6.5 11L0.00480938 0.5L12.9952 0.5L6.5 11Z"
-                  fill="#009986"
+                  fill={productsOpen ? "#009986" : "#566068"}
                 />
               </svg>
             </button>
 
             {productsOpen && (
-              <div className="absolute top-[50px] left-1/2 z-30 w-[340px] -translate-x-1/2 rounded-[20px] bg-[#E6F7F5] px-5 py-5 shadow-[0_6px_14px_rgba(0,0,0,0.12)]">
+              <div
+                className="absolute top-full left-1/2 mt-3 z-40 w-[340px] -translate-x-1/2 rounded-[20px] bg-[#E6F7F5] px-5 py-5 shadow-[0_6px_14px_rgba(0,0,0,0.12)]"
+                onMouseEnter={openProductsMenu}
+                onMouseLeave={closeProductsMenu}
+              >
                 <div className="flex flex-col gap-4">
-                  <Link
-                    to="/process-video"
-                    className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeInterviewNavigation}
+                    className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80 text-left"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -172,14 +150,15 @@ function HowItWorksPage() {
                       <path d="M12 20V11" />
                       <path d="m8.8 14.2 3.2-3.2 3.2 3.2" />
                     </svg>
-                    <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
+                    <span className="text-[18px] font-bold leading-none">
                       Analyze my interview
                     </span>
-                  </Link>
+                  </button>
 
-                  <Link
-                    to="/report"
-                    className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80"
+                  <button
+                    type="button"
+                    onClick={handleViewReportNavigation}
+                    className="flex items-center gap-3 text-[#009986] transition-opacity hover:opacity-80 text-left"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -196,110 +175,208 @@ function HowItWorksPage() {
                       <path d="M8 13h8" />
                       <path d="M8 17h5" />
                     </svg>
-                    <span className="[font-family:'Alegreya_Sans',Helvetica] text-[18px] font-bold leading-none">
+                    <span className="text-[18px] font-bold leading-none">
                       View my report
                     </span>
-                  </Link>
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          <Link
-            to="/signup"
-            className="ml-[8px] h-[45px] px-[28px] rounded-[15px] bg-[#009986] inline-flex items-center justify-center"
-          >
-            <span className="[font-family:'Alegreya_Sans',Helvetica] font-medium text-white text-[25px] leading-[normal] whitespace-nowrap">
+          <Link to="/signup">
+            <button
+              type="button"
+              className="bg-[#009986] text-white font-semibold text-base px-6 py-2 rounded-2xl hover:bg-[#007a6e] transition-colors"
+            >
               Sign up
-            </span>
+            </button>
           </Link>
         </nav>
+
+        <button
+          type="button"
+          className="md:hidden text-[#566068] focus:outline-none"
+          aria-label="Toggle menu"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          <svg
+            className="w-7 h-7"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            {mobileMenuOpen ? (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            ) : (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            )}
+          </svg>
+        </button>
       </header>
 
-      <section
-        aria-labelledby="how-it-works-heading"
-        className="absolute left-1/2 top-[180px] w-full max-w-[1200px] -translate-x-1/2 px-8"
-      >
-        <h1
-          id="how-it-works-heading"
-          className="text-center [font-family:'Inter',Helvetica] text-[40px] font-bold text-[#009986]"
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white shadow-md px-6 py-4 flex flex-col gap-4">
+          {navItems.map((item) => (
+            <Link
+              key={item.label}
+              to={item.href}
+              className={`text-left font-semibold text-lg ${
+                item.active ? "text-[#009986]" : "text-[#566068]"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setProductsOpen((prev) => !prev)}
+            className={`flex items-center gap-2 text-left font-semibold text-lg transition-colors ${
+              productsOpen ? "text-[#009986]" : "text-[#566068]"
+            }`}
+          >
+            <span>Products</span>
+            <svg
+              className={`w-2.5 h-2 transition-transform duration-200 ${
+                productsOpen ? "rotate-180" : ""
+              }`}
+              viewBox="0 0 13 11"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M6.5 11L0.00480938 0.5L12.9952 0.5L6.5 11Z"
+                fill={productsOpen ? "#009986" : "#566068"}
+              />
+            </svg>
+          </button>
+
+          {productsOpen && (
+            <div className="ml-4 flex flex-col gap-3 rounded-xl bg-[#E6F7F5] p-4">
+              <button
+                type="button"
+                onClick={handleAnalyzeInterviewNavigation}
+                className="text-[#009986] font-semibold text-left"
+              >
+                Analyze my interview
+              </button>
+              <button
+                type="button"
+                onClick={handleViewReportNavigation}
+                className="text-[#009986] font-semibold text-left"
+              >
+                View my report
+              </button>
+            </div>
+          )}
+
+          <Link
+            to="/signup"
+            className="bg-[#009986] text-white font-semibold text-base px-6 py-2 rounded-2xl w-fit hover:bg-[#007a6e] transition-colors inline-flex items-center justify-center"
+          >
+            Sign up
+          </Link>
+        </div>
+      )}
+
+      <main className="flex-1">
+        <section
+          aria-labelledby="how-it-works-heading"
+          className="w-full max-w-[1200px] mx-auto px-6 pt-20"
         >
-          How It works ?
-        </h1>
+          <h1
+            id="how-it-works-heading"
+            className="text-center text-[40px] font-bold text-[#009986]"
+          >
+            How It works ?
+          </h1>
 
-        <div className="relative mt-32">
-          <div className="absolute left-[12.5%] right-[12.5%] top-[52px] h-[2px] bg-[#009986]" />
+          <div className="relative mt-32">
+            <div className="hidden md:block absolute left-[12.5%] right-[12.5%] top-[52px] h-[2px] bg-[#009986]" />
 
-          <div className="relative z-10 grid grid-cols-4 items-start text-center">
-            <div className="flex flex-col items-center">
-              <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-[#E5E4E2]">
-                <img
-                  src="https://c.animaapp.com/zou3Gdv0/img/group-7@2x.png"
-                  alt="Upload video icon"
-                  className="h-[100px] w-[100px] object-contain"
-                />
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-0 items-start text-center">
+              <div className="flex flex-col items-center">
+                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-[#E5E4E2]">
+                  <img
+                    src="https://c.animaapp.com/zou3Gdv0/img/group-7@2x.png"
+                    alt="Upload video icon"
+                    className="h-[100px] w-[100px] object-contain"
+                  />
+                </div>
+                <div className="mt-10 text-[25px] font-bold text-[#808080] leading-tight">
+                  Upload
+                  <br />
+                  Video
+                </div>
               </div>
-              <div className="mt-10 [font-family:'Inter',Helvetica] text-[25px] font-bold text-[#808080] leading-tight">
-                Upload
-                <br />
-                Video
-              </div>
-            </div>
 
-            <div className="flex flex-col items-center">
-              <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
-                <img
-                  src="https://c.animaapp.com/zou3Gdv0/img/extraction-icon.svg"
-                  alt="Extraction icon"
-                  className="h-[67px] w-[67px]"
-                />
+              <div className="flex flex-col items-center">
+                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
+                  <img
+                    src="https://c.animaapp.com/zou3Gdv0/img/extraction-icon.svg"
+                    alt="Extraction icon"
+                    className="h-[67px] w-[67px]"
+                  />
+                </div>
+                <div className="mt-10 text-[25px] font-bold text-[#808080] leading-tight">
+                  Extract Streams
+                  <br />
+                  (Audio, Text, Visual)
+                </div>
               </div>
-              <div className="mt-10 [font-family:'Inter',Helvetica] text-[25px] font-bold text-[#808080] leading-tight">
-                Extract Streams
-                <br />
-                (Audio, Text, Visual )
-              </div>
-            </div>
 
-            <div className="flex flex-col items-center">
-              <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
-                <img
-                  src="https://c.animaapp.com/zou3Gdv0/img/ai-engine-icon.svg"
-                  alt="AI engine icon"
-                  className="h-[85px] w-[85px]"
-                />
+              <div className="flex flex-col items-center">
+                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
+                  <img
+                    src="https://c.animaapp.com/zou3Gdv0/img/ai-engine-icon.svg"
+                    alt="AI engine icon"
+                    className="h-[85px] w-[85px]"
+                  />
+                </div>
+                <div className="mt-10 text-[25px] font-bold text-[#808080] leading-tight">
+                  Ai Engine
+                  <br />
+                  Analysis
+                </div>
               </div>
-              <div className="mt-10 [font-family:'Inter',Helvetica] text-[25px] font-bold text-[#808080] leading-tight">
-                Ai Engine
-                <br />
-                Analysis
-              </div>
-            </div>
 
-            <div className="flex flex-col items-center">
-              <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
-                <img
-                  src="https://c.animaapp.com/zou3Gdv0/img/report.svg"
-                  alt="Report"
-                  className="h-[65px] w-[65px]"
-                />
-              </div>
-              <div className="mt-10 [font-family:'Inter',Helvetica] text-[25px] font-bold text-[#808080] leading-tight">
-                Get Practical
-                <br />
-                Report
+              <div className="flex flex-col items-center">
+                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full border-2 border-[#009986] bg-neutral-200">
+                  <img
+                    src="https://c.animaapp.com/zou3Gdv0/img/report.svg"
+                    alt="Report"
+                    className="h-[65px] w-[65px]"
+                  />
+                </div>
+                <div className="mt-10 text-[25px] font-bold text-[#808080] leading-tight">
+                  Get Practical
+                  <br />
+                  Report
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      <footer className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        <p className="[font-family:'Inter',Helvetica] text-xs font-normal text-[#888888] text-center">
+      <footer className="py-6">
+        <p className="text-xs font-normal text-[#888888] text-center">
           © 2026 Interview Me. All rights reserved.
         </p>
       </footer>
-    </main>
+    </div>
   );
 }
 

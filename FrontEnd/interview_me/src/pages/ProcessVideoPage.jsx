@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 function SidebarItem({ active = false, icon, label, to = "#" }) {
@@ -17,25 +17,25 @@ function SidebarItem({ active = false, icon, label, to = "#" }) {
   );
 }
 
-function DashboardIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#0FA99D"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4 shrink-0"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
+// function DashboardIcon() {
+//   return (
+//     <svg
+//       xmlns="http://www.w3.org/2000/svg"
+//       viewBox="0 0 24 24"
+//       fill="none"
+//       stroke="#0FA99D"
+//       strokeWidth="2.4"
+//       strokeLinecap="round"
+//       strokeLinejoin="round"
+//       className="h-4 w-4 shrink-0"
+//     >
+//       <rect x="3" y="3" width="7" height="7" rx="1.5" />
+//       <rect x="14" y="3" width="7" height="7" rx="1.5" />
+//       <rect x="3" y="14" width="7" height="7" rx="1.5" />
+//       <rect x="14" y="14" width="7" height="7" rx="1.5" />
+//     </svg>
+//   );
+// }
 
 function AnalyzeIcon() {
   return (
@@ -171,39 +171,15 @@ function AnalysisWeightsCard({
   threshold,
   setThreshold,
   isRecruiter,
+  weightError,
 }) {
   const total = Object.values(weights).reduce((sum, val) => sum + val, 0);
 
   const updateWeight = (key, nextValue) => {
-    const current = weights[key];
-    const diff = nextValue - current;
-    const otherKeys = Object.keys(weights).filter((k) => k !== key);
-    const updated = { ...weights };
-
-    updated[key] = nextValue;
-
-    if (diff > 0) {
-      let remainingToReduce = diff;
-
-      for (const otherKey of otherKeys) {
-        if (remainingToReduce <= 0) break;
-        const reducible = updated[otherKey];
-        const reduction = Math.min(reducible, remainingToReduce);
-        updated[otherKey] -= reduction;
-        remainingToReduce -= reduction;
-      }
-
-      if (remainingToReduce > 0) {
-        updated[key] = nextValue - remainingToReduce;
-      }
-    } else if (diff < 0) {
-      const increaseAmount = Math.abs(diff);
-      if (otherKeys.length > 0) {
-        updated[otherKeys[0]] += increaseAmount;
-      }
-    }
-
-    setWeights(updated);
+    setWeights((prev) => ({
+      ...prev,
+      [key]: nextValue,
+    }));
   };
 
   return (
@@ -251,9 +227,16 @@ function AnalysisWeightsCard({
       </div>
 
       <div className="mt-6 rounded-xl bg-[#F8FAFA] px-4 py-3 text-center">
-        <div className="text-[14px] font-semibold text-[#0FA99D]">
+        <div
+          className={`text-[14px] font-semibold ${
+            total === 100 ? "text-[#0FA99D]" : "text-red-500"
+          }`}
+        >
           Total: {total}%
         </div>
+        {weightError && (
+          <p className="mt-2 text-[13px] text-red-500">{weightError}</p>
+        )}
       </div>
 
       {isRecruiter && (
@@ -451,18 +434,27 @@ function StartProcessingButton({ disabled, onClick, loading }) {
 }
 
 function ProcessVideoPage() {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+
   const navigate = useNavigate();
 
   const [roleName, setRoleName] = useState("");
   const [threshold, setThreshold] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [weightError, setWeightError] = useState("");
+
   const inputRef = useRef(null);
 
   const role = localStorage.getItem("role") || "";
   const name = localStorage.getItem("name") || "";
   const token = localStorage.getItem("access_token") || "";
-  console.log("User info:", { role, name, token });
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/signin");
+  };
+
   const trimmedName = name.trim();
 
   const profileChar =
@@ -491,7 +483,6 @@ function ProcessVideoPage() {
   const onFilesAdded = (newFiles) => {
     const prepared = newFiles.map((file, index) => ({
       id: `${file.name}-${file.size}-${file.lastModified}-${Date.now()}-${index}`,
-      // strip extension for video_names field  e.g. "abubaker.mp4" → "abubaker"
       name: file.name,
       baseName: file.name.replace(/\.[^/.]+$/, ""),
       raw: file,
@@ -500,7 +491,6 @@ function ProcessVideoPage() {
     if (isRecruiter) {
       setFiles((prev) => [...prev, ...prepared]);
     } else {
-      // user: always replace with the single selected file
       setFiles(prepared.slice(0, 1));
     }
   };
@@ -515,23 +505,50 @@ function ProcessVideoPage() {
     [weights],
   );
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (totalWeight === 100) {
+      setWeightError("");
+    } else {
+      setWeightError("Weights must sum up to 100%");
+    }
+  }, [totalWeight]);
+
   const handleStartProcessing = async () => {
-    if (!files.length || totalWeight !== 100) return;
+    if (!files.length) return;
+
+    if (totalWeight !== 100) {
+      setWeightError("Weights must sum up to 100%");
+      return;
+    }
+
+    setWeightError("");
 
     try {
       setLoading(true);
 
       const formData = new FormData();
 
-      // ── files & video_names ──────────────────────────────────────────────
-      // The API expects repeated fields:
-      //   files=<blob>  video_names=<name>  (one pair per video)
       files.forEach((file) => {
         formData.append("files", file.raw);
         formData.append("video_names", file.baseName);
       });
 
-      // ── weights (convert % → decimal, e.g. 30 → 0.3) ────────────────────
       formData.append("fillers_weight", (weights.fillers / 100).toFixed(2));
       formData.append("pause_rate_weight", (weights.pause / 100).toFixed(2));
       formData.append("emotion_weight", (weights.emotion / 100).toFixed(2));
@@ -548,8 +565,6 @@ function ProcessVideoPage() {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
-            // NOTE: do NOT set Content-Type manually when using FormData
-            // the browser sets it automatically with the correct boundary
           },
           body: formData,
         },
@@ -562,7 +577,6 @@ function ProcessVideoPage() {
 
       const data = await response.json();
 
-      // persist in localStorage in case the report page needs it after refresh
       localStorage.setItem("candidateReportData", JSON.stringify(data));
 
       navigate("/history", { state: { reportData: data } });
@@ -602,16 +616,6 @@ function ProcessVideoPage() {
           <div className="text-[34px] font-normal text-[#0FA99D] [font-family:'Pacifico',Helvetica]">
             Interview me
           </div>
-
-          {/* <div className="relative w-[340px]">
-            <input
-              className="h-[36px] w-full rounded-full bg-[#EFEFEF] pl-10 pr-4 text-[11px] text-gray-700 outline-none placeholder:text-[#9CA3AF]"
-              placeholder="Search candidates, reports ..etc"
-            />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[#9CA3AF]">
-              🔍
-            </span>
-          </div> */}
         </div>
 
         <div className="flex items-center gap-4">
@@ -623,20 +627,34 @@ function ProcessVideoPage() {
               {isRecruiter ? "Recruiter Admin" : "User"}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/history")}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
-          >
-            {profileChar || "NA"}
-          </button>
+          <div ref={profileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((prev) => !prev)}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
+            >
+              {profileChar || "NA"}
+            </button>
+
+            {profileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-[170px] rounded-[14px] border border-[#E5E7EB] bg-white py-2 shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-left text-[14px] font-medium text-[#374151] hover:bg-[#F3F4F6]"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="flex">
         <aside className="min-h-[calc(100vh-72px)] w-[240px] bg-white">
           <nav className="mt-10 flex flex-col gap-2 px-3">
-            <SidebarItem icon={<DashboardIcon />} label="Dashboard" to="/" />
+            {/* <SidebarItem icon={<DashboardIcon />} label="Dashboard" to="/" /> */}
             <SidebarItem
               active
               icon={<AnalyzeIcon />}
@@ -669,6 +687,7 @@ function ProcessVideoPage() {
                 threshold={threshold}
                 setThreshold={setThreshold}
                 isRecruiter={isRecruiter}
+                weightError={weightError}
               />
             </div>
 
@@ -686,7 +705,7 @@ function ProcessVideoPage() {
                 removeFile={removeFile}
               />
               <StartProcessingButton
-                disabled={!files.length || totalWeight !== 100}
+                disabled={!files.length}
                 onClick={handleStartProcessing}
                 loading={loading}
               />

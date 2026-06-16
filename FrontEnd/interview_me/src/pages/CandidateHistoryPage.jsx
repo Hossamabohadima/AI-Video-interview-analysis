@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 function formatDate(dateString) {
   const date = new Date(dateString);
@@ -92,7 +92,7 @@ function SessionCard({ session }) {
         <div className="flex flex-wrap gap-3 text-[10px] text-[#A1A1AA]">
           <span>📅 {session.date}</span>
           <span>⏱ {session.duration} duration</span>
-          <span>🎯 {session.role}</span>
+          {/* <span>🎯 {session.role}</span> */}
         </div>
       </div>
 
@@ -108,7 +108,7 @@ function SessionCard({ session }) {
             session.first ? "text-[#9CA3AF]" : "text-[#0FA99D]"
           }`}
         >
-          {session.overall}%
+          {Math.round(session.overall * 100)}%
         </div>
         <div className="text-[9px] text-[#A1A1AA]">Overall</div>
       </div>
@@ -163,6 +163,7 @@ function CandidateHistoryPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const role = localStorage.getItem("role");
   const name = localStorage.getItem("name");
@@ -177,6 +178,29 @@ function CandidateHistoryPage() {
           .toUpperCase()
       : name.trim().slice(0, 2).toUpperCase();
   const isRecruiter = role === "RECRUITER";
+
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/signin");
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -195,6 +219,8 @@ function CandidateHistoryPage() {
         });
 
         const data = await response.json();
+
+        console.log("Fetched reports:", data);
 
         if (!response.ok) {
           throw new Error(
@@ -245,12 +271,30 @@ function CandidateHistoryPage() {
                 ? ""
                 : `${deltaValue >= 0 ? "+" : ""}${deltaValue} vs prev`,
             metrics: [
-              { label: "Grammar", value: report.grammar_score ?? 0 },
-              { label: "Fillers", value: report.fillers_score ?? 0 },
-              { label: "Pause Rate", value: report.pause_rate_score ?? 0 },
-              { label: "Energy", value: report.energy_score ?? 0 },
-              { label: "Eye Contact", value: report.eye_contact_score ?? 0 },
-              { label: "Emotion", value: report.emotion_score ?? 0 },
+              {
+                label: "Grammar",
+                value: Math.round(report.grammar_score * 100) ?? 0,
+              },
+              {
+                label: "Fillers",
+                value: Math.round(report.fillers_score * 100) ?? 0,
+              },
+              {
+                label: "Pause Rate",
+                value: Math.round(report.pause_rate_score * 100) ?? 0,
+              },
+              {
+                label: "Energy",
+                value: Math.round(report.energy_score * 100) ?? 0,
+              },
+              {
+                label: "Eye Contact",
+                value: Math.round(report.eye_contact_score * 100) ?? 0,
+              },
+              {
+                label: "Emotion",
+                value: Math.round(report.emotion_score * 100) ?? 0,
+              },
             ],
           };
         });
@@ -395,13 +439,27 @@ function CandidateHistoryPage() {
               {isRecruiter ? "Recruiter Admin" : "User"}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/history")}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
-          >
-            {profileChar || "NA"}
-          </button>
+          <div ref={profileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((prev) => !prev)}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#DDF8F2] text-[10px] font-bold text-[#0FA99D] transition hover:opacity-80"
+            >
+              {profileChar || "NA"}
+            </button>
+
+            {profileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-[170px] rounded-[14px] border border-[#E5E7EB] bg-white py-2 shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-left text-[14px] font-medium text-[#374151] hover:bg-[#F3F4F6]"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -410,7 +468,7 @@ function CandidateHistoryPage() {
         {/* Sidebar */}
         <aside className="min-h-[calc(100vh-72px)] w-[240px] bg-white">
           <nav className="mt-8 flex flex-col gap-2 px-3">
-            <Link
+            {/* <Link
               to="/"
               className="flex items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
             >
@@ -432,7 +490,7 @@ function CandidateHistoryPage() {
                 </svg>
               </span>
               <span>Dashboard</span>
-            </Link>
+            </Link> */}
 
             <Link
               to="/process-video"
@@ -494,17 +552,21 @@ function CandidateHistoryPage() {
               />
               <InfoCard
                 title="Best score"
-                value={bestSession ? `${bestSession.overall}%` : "0%"}
+                value={
+                  bestSession
+                    ? `${Math.round(bestSession.overall * 100)}%`
+                    : "0%"
+                }
                 subtitle={
                   bestSession
-                    ? `${bestSession.date} · Session ${bestSession.id}`
+                    ? `${bestSession.date} · Session ${bestSession.sessionNumber}`
                     : "No best score yet"
                 }
                 accent
               />
               <InfoCard
                 title="Avg. overall score"
-                value={`${averageOverall}%`}
+                value={`${Math.round(averageOverall * 100)}%`}
                 subtitle="Across all sessions"
               />
               {/* <InfoCard
@@ -527,7 +589,7 @@ function CandidateHistoryPage() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="h-[34px] w-full rounded-lg border border-[#EFEFEF] bg-[#FAFAFA] py-2 pl-8 pr-3 text-[11px] outline-none placeholder:text-[#B0B0B0]"
-                      placeholder="Search by date, role, score, or session..."
+                      placeholder="Search by date, score, or session..."
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[#B0B0B0]">
                       🔍
