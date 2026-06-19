@@ -1,0 +1,6 @@
+$kind: http-request
+name: Get Metric Weights
+method: GET
+url: '{{baseUrl}}/metrics/weights'
+order: 1000
+description: Retrieve the current metric weights for the authenticated user.

@@ -4,6 +4,7 @@ from .api.user import router as user_router
 from .api.user_auth import router as auth_router
 from .api.metrics import router as metrics_router
 from .api.scores import router as scores_router
+from .api.reset_password import router as password_reset_router
 
 app = FastAPI(
     title="interviewMe",
@@ -12,14 +13,6 @@ app = FastAPI(
 )
 
 # Allow frontend to communicate with backend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -35,7 +28,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include all routers
 app.include_router(auth_router)
+app.include_router(password_reset_router)  # Password reset endpoints
 app.include_router(metrics_router)
 app.include_router(scores_router)
 app.include_router(user_router)

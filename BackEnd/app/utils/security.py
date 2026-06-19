@@ -8,6 +8,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
+# In-memory token blacklist (use Redis in production)
+_token_blacklist = set()
+
 
 def hash_password(password: str) -> str:
     """Hash password using bcrypt. Truncates to 72 bytes as bcrypt requires."""
@@ -25,6 +28,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     plain_bytes = plain_password[:72].encode('utf-8')
     hashed_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(plain_bytes, hashed_bytes)
+
 
 def create_access_token(user_id: int, role: str, expires_delta: Optional[timedelta] = None) -> str:
     if expires_delta:
@@ -48,3 +52,22 @@ def verify_token(token: str) -> dict:
         raise ValueError("Token expired")
     except jwt.InvalidTokenError:
         raise ValueError("Invalid token")
+
+
+def blacklist_token(token: str) -> bool:
+    """Add a token to the blacklist to prevent reuse after logout.
+
+    In production, use Redis or database-backed storage.
+    """
+    try:
+        # Verify token is valid before blacklisting
+        payload = verify_token(token)
+        _token_blacklist.add(token)
+        return True
+    except Exception:
+        return False
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """Check if a token has been blacklisted."""
+    return token in _token_blacklist
