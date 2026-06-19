@@ -413,3 +413,61 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION get_video_status_sp(
+    p_video_id INT,
+    p_user_id INT
+)
+RETURNS TABLE(
+    video_id INT,
+    video_name VARCHAR(50),
+    status videoStatus,
+    duration DECIMAL(5,2),
+    upload_date TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        v.videoid,
+        v.videoname,
+        v.status,
+        v.duration,
+        v.uploaddate
+    FROM Video v
+    WHERE v.videoid = p_video_id AND v.userid = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION delete_video_sp(
+    p_video_id INT,
+    p_user_id INT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_owner INT;
+BEGIN
+    SELECT userid INTO v_owner FROM Video WHERE videoid = p_video_id;
+    
+    IF v_owner IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    
+    IF v_owner != p_user_id THEN
+        RETURN FALSE;
+    END IF;
+    
+    DELETE FROM Video WHERE videoid = p_video_id;
+    RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM password_reset_tokens WHERE expires_at < CURRENT_TIMESTAMP;
+    DELETE FROM token_blacklist WHERE expires_at < CURRENT_TIMESTAMP;
+END;
+$$;

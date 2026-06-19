@@ -1,0 +1,24 @@
+$kind: http-request
+name: Get Video Report
+method: GET
+url: '{{baseUrl}}/users/reports/{{video_id}}'
+order: 2000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+pathVariables:
+  - key: video_id
+    value: '{{video_id}}'
+    description: The unique ID of the video to retrieve the analysis report for.
+description: 'Retrieve the detailed analysis report for a specific video by its ID. Complements GET /users/reports which returns all reports.'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Report retrieved successfully", function() { pm.response.to.have.status(200); });
+      pm.test("Response has report data", function() {
+        const json = pm.response.json();
+        pm.expect(json).to.have.property("video_id");
+      });
+    language: text/javascript

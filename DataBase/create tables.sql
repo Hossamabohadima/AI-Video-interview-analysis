@@ -1,4 +1,8 @@
--- 1. Create the custom type 
+-- ============================================================
+-- InterviewMe Database Schema - Complete (Original + Updates)
+-- ============================================================
+
+-- 1. Create the custom types
 CREATE TYPE user_role AS ENUM ('USER', 'RECRUITER');
 CREATE TYPE videoStatus AS ENUM ('DONE', 'FAILED', 'PENDING');
 
@@ -19,19 +23,17 @@ CREATE TABLE Threshold (
     thresholdValue DECIMAL(5,2) NOT NULL
 );
 
-
-
--- 5. Create Video table
+-- 4. Create Video table
 CREATE TABLE Video (
     videoID SERIAL PRIMARY KEY,
     VideoName VARCHAR(50) NOT NULL,
     userID int REFERENCES Users(userid) ON DELETE CASCADE,
     uploadDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    duration DECIMAL(5,2) ,
+    duration DECIMAL(5,2),
     status videoStatus NOT NULL 
 );
 
--- 6. Create VideoMetricWeight table for per-video weight storage
+-- 5. Create VideoMetricWeight table for per-video weight storage
 CREATE TABLE VideoMetricWeight (
     videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
     fillers_weight DECIMAL(5,4) NOT NULL,
@@ -50,7 +52,7 @@ CREATE TABLE VideoMetricWeight (
     )
 );
 
--- 7. Create videoScore table
+-- 6. Create videoScore table
 CREATE TABLE videoScore (
     videoID INT PRIMARY KEY REFERENCES Video(videoID) ON DELETE CASCADE,
     fillers_score DECIMAL(5,2) DEFAULT 0,
@@ -75,3 +77,33 @@ CREATE TABLE VideoAnalysis (
     grammar_Mistakes JSONB,
     total_Score DECIMAL(10,4)
 );
+
+-- ============================================================
+-- NEW: Password Reset & Token Blacklist Tables
+-- ============================================================
+
+-- 8. Create password_reset_tokens table for secure password reset flow
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES Users(userid) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    UNIQUE(user_id)
+);
+
+-- Index for fast token lookup
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
+
+-- 9. Create token_blacklist table for logout functionality
+-- (In production with Redis, this table can be omitted)
+CREATE TABLE IF NOT EXISTS token_blacklist (
+    id SERIAL PRIMARY KEY,
+    token_jti TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_blacklist_jti ON token_blacklist(token_jti);
+CREATE INDEX IF NOT EXISTS idx_blacklist_expires ON token_blacklist(expires_at);

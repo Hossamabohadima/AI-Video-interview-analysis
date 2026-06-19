@@ -1,0 +1,20 @@
+$kind: http-request
+name: Sign Up
+method: POST
+url: "{{baseUrl}}/users/auth/signup"
+order: 1000
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Test User",
+      "email": "test@example.com",
+      "password": "password123",
+      "phone_number": "+1234567890",
+      "role": "USER"
+    }
+description: Register a new user account. Role must be USER or RECRUITER.
