@@ -1,0 +1,15 @@
+$kind: http-request
+name: Compare Reports
+method: POST
+url: '{{baseUrl}}/users/reports/compare'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "video_ids": [1, 2]
+    }
+description: Compare two or more video reports. Provide at least two video IDs.

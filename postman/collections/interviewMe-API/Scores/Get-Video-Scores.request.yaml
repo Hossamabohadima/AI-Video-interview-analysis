@@ -1,0 +1,6 @@
+$kind: http-request
+name: Get Video Scores
+method: GET
+url: '{{baseUrl}}/scores/{{videoId}}'
+order: 1000
+description: Retrieve analysis scores for a specific video by its ID.

@@ -1,0 +1,6 @@
+$kind: http-request
+name: Get User Reports
+method: GET
+url: '{{baseUrl}}/users/reports'
+order: 1000
+description: Retrieve all video analysis reports for the authenticated user.

@@ -7,13 +7,22 @@ from ..db import get_db_connection
 from ..schemas.video import Scores
 
 
+def _safe_float(value, default=0.0):
+    """Safely convert a value to float, handling None."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 async def get_video_scores(video_id: int, user_id: int) -> dict:
     """Retrieve scores for a specific video."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
-        # Note: Keeping the array syntax [video_id] to match your current SQL signature
         cur.execute(
             "SELECT get_video_score_and_analysis AS data FROM get_video_score_and_analysis(%s, %s)",
             ([video_id], user_id)
@@ -22,41 +31,42 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
         
         if not row or not row.get("data"):
             raise ValueError(f"No data returned for video {video_id}")
-        result_data = row["data"] # This contains {'scores': [...], 'analysis': [...]}
         
-        # Extract lists
+        result_data = row["data"]
+        
         scores_list = result_data.get("scores", [])
         analysis_list = result_data.get("analysis", [])
-        print()
+        
         if not scores_list or not analysis_list:
             raise ValueError(f"No scores or analysis found for video {video_id}")
-        # Since it returns lists, get the first element
-        # (Be aware of case-sensitivity changes in your SQL jsonb_build_object keys!)
-        score_data = scores_list[0]  
+        
+        score_data = scores_list[0]
         analysis_data = analysis_list[0]
+        
+        # Use safe_float to handle None values
         score = Scores(
-            fillers_score=float(score_data["fillers_score"]),
-            pause_rate_score=float(score_data["pause_rate_score"]),
-            emotion_score=float(score_data["emotion_score"]),
-            energy_score=float(score_data["energy_score"]),
-            eye_contact_score=float(score_data["eye_contact_score"]),
-            grammar_score=float(score_data["grammar_score"]),
-            total_score=float(score_data["total_score"]),
+            fillers_score=_safe_float(score_data.get("fillers_score"), 0.0),
+            pause_rate_score=_safe_float(score_data.get("pause_rate_score"), 0.0),
+            emotion_score=_safe_float(score_data.get("emotion_score"), 0.0),
+            energy_score=_safe_float(score_data.get("energy_score"), 0.0),
+            eye_contact_score=_safe_float(score_data.get("eye_contact_score"), 0.0),
+            grammar_score=_safe_float(score_data.get("grammar_score"), 0.0),
+            total_score=_safe_float(score_data.get("total_score"), 0.0),
             video_id=video_id
         )
-        # Load the API key securely from environmental variables
+        
         groq_client = AsyncOpenAI(
             api_key="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",
             base_url="https://api.groq.com/openai/v1"
         )
-        # Keep an eye on casing: SQL built 'fillers_Word' but you are calling 'fillers_words'
+        
         report = await video_report(groq_client, score, {
-            "fillers_words": analysis_data["fillers_Word"],
-            "rate_of_stop": analysis_data["rate_Of_Stop"],
-            "emotion_analysis": analysis_data["emotion_analysis"],
-            "energy_statistics": analysis_data["energy_Statistics"],
-            "eye_contact": analysis_data["eye_Contact"],
-            "grammar_mistakes": analysis_data["grammar_Mistakes"],
+            "fillers_words": analysis_data.get("fillers_Word") or {},
+            "rate_of_stop": _safe_float(analysis_data.get("rate_Of_Stop"), 0.0),
+            "emotion_analysis": analysis_data.get("emotion_analysis") or {},
+            "energy_statistics": analysis_data.get("energy_Statistics") or {},
+            "eye_contact": analysis_data.get("eye_Contact") or {},
+            "grammar_mistakes": analysis_data.get("grammar_Mistakes") or [],
         })
         
         return {"score": score, "report": report}
@@ -66,6 +76,7 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
     finally:
         cur.close()
         conn.close()
+
 
 async def insert_video_scores(video_id: int, scores: Scores) -> bool:
     """Insert scores for a video using the stored procedure."""

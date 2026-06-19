@@ -8,7 +8,7 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 @router.get("/weights", response_model=MetricWeights)
 async def get_weights(current_user: dict = Depends(get_current_user)):
-    """Retrieve metric weights for the current user."""
+    """Get current user's metric weights."""
     try:
         weights = await get_metric_weights(current_user["user_id"])
         return weights
@@ -25,17 +25,18 @@ async def get_weights(current_user: dict = Depends(get_current_user)):
 
 
 @router.put("/weights", response_model=dict)
-async def set_weights(weights: MetricWeights, current_user: dict = Depends(get_current_user)):
-    """Update metric weights for the current user."""
+async def update_weights(
+    weights: MetricWeights,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update current user's metric weights."""
     try:
         success = await set_metric_weights(current_user["user_id"], weights)
-        
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        
         return {"message": "Metric weights updated successfully"}
     except ValueError as e:
         raise HTTPException(

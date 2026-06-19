@@ -1,11 +1,14 @@
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends, Body
-from streamlit import json
+import json
+import os
 from ..schemas.video import MetricWeights
 from ..services.user_service import (
     get_reports, 
     compare_reports, 
     set_threshold_score,
+    get_single_report,
+    delete_user_video,
 )
 from ..services.video import handle_uploaded_video
 from ..utils.dependencies import get_current_user
@@ -30,6 +33,28 @@ async def get_user_reports(current_user: dict = Depends(get_current_user)):
             detail=f"Failed to retrieve reports: {str(e)}"
         )
 
+
+@router.get("/reports/{video_id}", status_code=status.HTTP_200_OK)
+async def get_user_single_report(
+    video_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retrieve a single cached video report with scores and analysis."""
+    try:
+        report_data = await get_single_report(video_id, current_user["user_id"])
+        return report_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve report: {str(e)}"
+        )
+
+
 @router.post("/reports/compare", status_code=status.HTTP_200_OK)
 async def compare_user_reports(
     video_ids: Optional[List[int]] = Body(default=None, embed=True),
@@ -45,7 +70,7 @@ async def compare_user_reports(
         result, report = await compare_reports(video_ids, current_user["user_id"])
         print(f"Comparison result: {result}")
         print(f"Generated report: {report}")
-        # 🚀 FIX 1: If result is a JSON string, deserialize it into a list/dict first
+        # Fix 1: If result is a JSON string, deserialize it into a list/dict first
         if isinstance(result, str):
             try:
                 result = json.loads(result)
@@ -81,7 +106,7 @@ async def compare_user_reports(
             "comparison": result, 
             "report": report
         }
-        
+
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -112,6 +137,28 @@ async def update_user_threshold(score: float, current_user: dict = Depends(get_c
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update threshold: {str(e)}"
+        )
+
+
+
+@router.delete("/videos/{video_id}", status_code=status.HTTP_200_OK)
+async def delete_video(
+    video_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a video and all associated data (scores, analysis, files)."""
+    try:
+        result = await delete_user_video(video_id, current_user["user_id"])
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete video: {str(e)}"
         )
 
 

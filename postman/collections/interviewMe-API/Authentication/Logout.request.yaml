@@ -1,0 +1,19 @@
+$kind: http-request
+name: Logout
+method: POST
+url: '{{baseUrl}}/users/auth/logout'
+order: 3000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+description: 'Invalidate the current JWT token and end the user session (UC-06). Requires a valid Bearer token in the Authorization header.'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Logout successful", function() { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        pm.collectionVariables.set("authToken", "");
+      }
+    language: text/javascript

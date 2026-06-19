@@ -1,0 +1,26 @@
+$kind: http-request
+name: Login
+method: POST
+url: "{{baseUrl}}/users/auth/login"
+order: 2000
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "test@example.com",
+      "password": "password123"
+    }
+description: Authenticate user and return JWT token. Save the returned access_token to {{authToken}}.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Login successful", function() { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        const json = pm.response.json();
+        pm.collectionVariables.set("authToken", json.access_token);
+      }
+    language: text/javascript
