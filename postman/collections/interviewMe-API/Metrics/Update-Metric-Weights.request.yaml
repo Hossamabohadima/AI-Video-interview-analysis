@@ -1,0 +1,20 @@
+$kind: http-request
+name: Update Metric Weights
+method: PUT
+url: '{{baseUrl}}/metrics/weights'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "fillers_weight": 0.2,
+      "pause_rate_weight": 0.2,
+      "emotion_weight": 0.15,
+      "energy_weight": 0.15,
+      "eye_contact_weight": 0.15,
+      "grammar_weight": 0.15
+    }
+description: Update metric weights for the authenticated user. All weights must sum to exactly 1.0.

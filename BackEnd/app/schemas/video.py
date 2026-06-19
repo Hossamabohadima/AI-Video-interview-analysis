@@ -10,16 +10,15 @@ class Video(BaseModel):
     status: str = Field(..., min_length=1)
 
 class MetricWeights(BaseModel):
-    fillers_weight: float = Field(..., ge=0, le=1)
-    pause_rate_weight: float = Field(..., ge=0, le=1)
-    emotion_weight: float = Field(..., ge=0, le=1)
-    energy_weight: float = Field(..., ge=0, le=1)
-    eye_contact_weight: float = Field(..., ge=0, le=1)
-    grammar_weight: float = Field(..., ge=0, le=1)
+    fillers_weight: float = Field(default=1/6, ge=0, le=1)
+    pause_rate_weight: float = Field(default=1/6, ge=0, le=1)
+    emotion_weight: float = Field(default=1/6, ge=0, le=1)
+    energy_weight: float = Field(default=1/6, ge=0, le=1)
+    eye_contact_weight: float = Field(default=1/6, ge=0, le=1)
+    grammar_weight: float = Field(default=1/6, ge=0, le=1)
 
     @model_validator(mode='after')
     def weights_must_sum_to_one(self) -> 'MetricWeights':
-        # Sum the values directly from the model attributes
         total = (
             self.fillers_weight
             + self.pause_rate_weight
@@ -28,12 +27,8 @@ class MetricWeights(BaseModel):
             + self.eye_contact_weight
             + self.grammar_weight
         )
-        
-        # Use math.isclose or keep your current delta check
         if abs(total - 1.0) > 1e-6:
             raise ValueError('Metric weights must sum to 1.0')
-            
-        # Crucial for Pydantic v2: always return self
         return self
 class VideoComparisonRequest(BaseModel):
     video_ids: List[int] = Field(..., min_items=2)

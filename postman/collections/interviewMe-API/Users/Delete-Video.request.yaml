@@ -1,0 +1,6 @@
+$kind: http-request
+name: Delete Video
+method: DELETE
+url: '{{baseUrl}}/users/videos/{{video_id}}'
+order: 3000
+description: Delete a video and all associated data (scores, analysis, files).

@@ -1,0 +1,14 @@
+$kind: collection
+name: interviewMe API
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+variables:
+  - key: baseUrl
+    value: 'http://127.0.0.1:8000'
+  - key: authToken
+    value: ''
+  - key: videoId
+    value: '1'

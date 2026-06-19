@@ -432,6 +432,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
 
     ext = os.path.splitext(file.filename)[1]
     unique_name = video_name + "_" + str(uuid.uuid4()) + ext
+    unique_name = unique_name[:50]  # Truncate to 50 chars
     output_path = os.path.join(folder, unique_name)
 
     duration = 0.0
@@ -459,7 +460,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
 
         if weights is not None:
             cur.execute(
-                "SELECT insert_or_update_video_metric_weight(%s, %s, %s, %s, %s, %s, %s)",
+                "SELECT insert_or_update_video_metric_weight(%s::integer, %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::numeric, %s::numeric)",
                 (
                     video_id,
                     weights.fillers_weight,

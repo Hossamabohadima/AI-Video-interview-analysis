@@ -1,0 +1,42 @@
+$kind: http-request
+name: Upload Videos
+method: POST
+url: "{{baseUrl}}/users/videos/upload"
+order: 4000
+body:
+  type: formdata
+  content:
+    - type: file
+      key: files
+      src: []
+      description: The video file(s) to upload
+      disabled: false
+    - type: text
+      key: video_names
+      value: My Interview Video
+      disabled: false
+    - type: text
+      key: fillers_weight
+      value: "0.2"
+      disabled: false
+    - type: text
+      key: pause_rate_weight
+      value: "0.2"
+      disabled: false
+    - type: text
+      key: emotion_weight
+      value: "0.15"
+      disabled: false
+    - type: text
+      key: energy_weight
+      value: "0.15"
+      disabled: false
+    - type: text
+      key: eye_contact_weight
+      value: "0.15"
+      disabled: false
+    - type: text
+      key: grammar_weight
+      value: "0.15"
+      disabled: false
+description: Upload and process one or more interview videos with metric weights. All weights must sum to 1.0.

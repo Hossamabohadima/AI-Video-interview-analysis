@@ -1,0 +1,9 @@
+$kind: http-request
+name: Update Threshold
+method: PUT
+url: '{{baseUrl}}/users/threshold'
+order: 3000
+queryParams:
+  - key: score
+    value: '0.7'
+description: Update the passing threshold score for the authenticated user. Score is a float between 0 and 1 passed as a query parameter.
