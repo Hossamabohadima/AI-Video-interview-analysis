@@ -9,6 +9,9 @@ from ..db import get_db_connection
 from ..schemas.video import MetricWeights
 from ..services.report import video_report, compare_between_reports
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 async def get_reports(user_id: int):
     """Fetch all video reports for a user."""
@@ -162,8 +165,9 @@ async def compare_reports(video_ids: list[int], user_id: int):
                 status_code=404,
                 detail="No videos found for comparison"
             )
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
         Groq_client = AsyncOpenAI(
-            api_key="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",
+            api_key=GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1"
         )
         report = await compare_between_reports(Groq_client, result)

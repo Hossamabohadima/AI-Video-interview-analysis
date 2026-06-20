@@ -1,11 +1,14 @@
 from openai import AsyncOpenAI
 import psycopg2
 import psycopg2.extras
-
+import os
+from dotenv import load_dotenv
 from ..services.report import video_report
 from ..db import get_db_connection
 from ..schemas.video import Scores
 
+
+load_dotenv()
 
 def _safe_float(value, default=0.0):
     """Safely convert a value to float, handling None."""
@@ -55,8 +58,10 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
             video_id=video_id
         )
         
-        groq_client = AsyncOpenAI(
-            api_key="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",
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+        Groq_client = AsyncOpenAI(
+            api_key=GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1"
         )
         
