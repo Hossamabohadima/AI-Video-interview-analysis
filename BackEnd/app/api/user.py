@@ -1,7 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends, Body
 import json
-import os
 from ..schemas.video import MetricWeights
 from ..services.user_service import (
     get_reports, 
@@ -9,6 +8,7 @@ from ..services.user_service import (
     set_threshold_score,
     get_single_report,
     delete_user_video,
+    get_video_processing_status
 )
 from ..services.video import handle_uploaded_video
 from ..utils.dependencies import get_current_user
@@ -70,7 +70,7 @@ async def compare_user_reports(
         result, report = await compare_reports(video_ids, current_user["user_id"])
         print(f"Comparison result: {result}")
         print(f"Generated report: {report}")
-        # Fix 1: If result is a JSON string, deserialize it into a list/dict first
+        
         if isinstance(result, str):
             try:
                 result = json.loads(result)
@@ -79,9 +79,7 @@ async def compare_user_reports(
 
         found_ids = set()
 
-        # 2. Extract IDs safely from the dictionary structure
         if isinstance(result, dict):
-            # We check 'scores', but you could also use 'analysis'
             scores_list = result.get("scores", [])
             if isinstance(scores_list, list):
                 found_ids = {
@@ -90,7 +88,6 @@ async def compare_user_reports(
                     if isinstance(row, dict) and "videoID" in row
                 }
 
-        # 3. Check for missing IDs
         requested_ids = list(dict.fromkeys(video_ids))
         missing_ids = [vid for vid in requested_ids if vid not in found_ids]
 
@@ -106,7 +103,7 @@ async def compare_user_reports(
             "comparison": result, 
             "report": report
         }
-
+        
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -139,6 +136,26 @@ async def update_user_threshold(score: float, current_user: dict = Depends(get_c
             detail=f"Failed to update threshold: {str(e)}"
         )
 
+
+@router.get("/videos/{video_id}/status", status_code=status.HTTP_200_OK)
+async def get_video_status(
+    video_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the processing status of a specific video."""
+    try:
+        status_data = await get_video_processing_status(video_id, current_user["user_id"])
+        return status_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve video status: {str(e)}"
+        )
 
 
 @router.delete("/videos/{video_id}", status_code=status.HTTP_200_OK)
@@ -201,7 +218,6 @@ async def upload_videos(
                 detail=str(e)
             )
         except Exception as e:
-            # Detailed error for debugging — revert to generic message in production
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to process video '{video_name}': {str(e)}"

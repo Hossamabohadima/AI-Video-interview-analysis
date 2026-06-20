@@ -30,10 +30,11 @@ app.add_middleware(
 
 # Include all routers
 app.include_router(auth_router)
-app.include_router(password_reset_router)  # Password reset endpoints
+app.include_router(password_reset_router)
 app.include_router(metrics_router)
 app.include_router(scores_router)
 app.include_router(user_router)
+app.include_router(admin_router)
 
 @app.on_event("startup")
 async def startup_event():

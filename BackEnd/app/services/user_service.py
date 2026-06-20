@@ -5,16 +5,18 @@ from decimal import Decimal
 from openai import AsyncOpenAI
 import psycopg2
 import psycopg2.extras
+import os
+
 from ..db import get_db_connection
 from ..schemas.video import MetricWeights
 from ..services.report import video_report, compare_between_reports
-import os
+
 
 async def get_reports(user_id: int):
     """Fetch all video reports for a user."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
+    
     try:
         cur.execute("SELECT * FROM get_reports_sp(%s)", (user_id,))
         data = cur.fetchall()
@@ -27,35 +29,30 @@ async def get_reports(user_id: int):
 
 
 async def get_single_report(video_id: int, user_id: int) -> dict:
-    """Fetch a single cached video report with scores and analysis data.
-
-    Returns the complete report including scores, analysis details, and generated report text.
-    """
+    """Fetch a single cached video report with scores and analysis data."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
+    
     try:
-        # Get video info with scores and analysis
         cur.execute(
             "SELECT get_video_score_and_analysis AS data FROM get_video_score_and_analysis(%s, %s)",
             ([video_id], user_id)
         )
         row = cur.fetchone()
-
+        
         if not row or not row.get("data"):
             raise ValueError(f"Video report not found for video {video_id}")
-
+        
         result_data = row["data"]
         scores_list = result_data.get("scores", [])
         analysis_list = result_data.get("analysis", [])
-
+        
         if not scores_list or not analysis_list:
             raise ValueError(f"Incomplete report data for video {video_id}")
-
+        
         score_data = scores_list[0]
         analysis_data = analysis_list[0]
-
-        # Build complete report response
+        
         return {
             "video_id": video_id,
             "scores": {
@@ -76,7 +73,7 @@ async def get_single_report(video_id: int, user_id: int) -> dict:
                 "grammar_mistakes": analysis_data.get("grammar_Mistakes")
             }
         }
-
+        
     except ValueError:
         raise
     except Exception as e:
@@ -86,50 +83,74 @@ async def get_single_report(video_id: int, user_id: int) -> dict:
         conn.close()
 
 
-async def delete_user_video(video_id: int, user_id: int) -> dict:
-    """Delete a video and all associated data.
-
-    Deletes:
-    - Video file from storage
-    - Video record from database (cascades to scores, analysis, weights)
-    """
+async def get_video_processing_status(video_id: int, user_id: int) -> dict:
+    """Get the processing status of a specific video."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
+    
     try:
-        # First get video info to delete file
+        cur.execute("""
+            SELECT 
+                v.videoid as video_id,
+                v.videoname as video_name,
+                v.status,
+                v.duration,
+                v.uploaddate::TEXT as upload_date
+            FROM Video v
+            WHERE v.videoid = %s AND v.userid = %s
+        """, (video_id, user_id))
+        
+        result = cur.fetchone()
+        if not result:
+            raise ValueError("Video not found or access denied")
+        
+        return dict(result)
+        
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Failed to get video status: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
+
+async def delete_user_video(video_id: int, user_id: int) -> dict:
+    """Delete a video and all associated data."""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
         cur.execute(
             "SELECT videoname, userid FROM Video WHERE videoid = %s",
             (video_id,)
         )
         video = cur.fetchone()
-
+        
         if not video:
             raise ValueError("Video not found")
-
+        
         if video["userid"] != user_id:
             raise ValueError("Access denied: You can only delete your own videos")
-
+        
         video_name = video["videoname"]
         video_path = os.path.join("videos", video_name)
-
-        # Delete video file if exists
+        
         if os.path.exists(video_path):
             try:
                 os.remove(video_path)
             except OSError as e:
                 print(f"Warning: Could not delete video file {video_path}: {e}")
-
-        # Delete from database (cascades to related tables via FK constraints)
+        
         cur.execute("DELETE FROM Video WHERE videoid = %s", (video_id,))
         conn.commit()
-
+        
         return {
             "message": "Video deleted successfully",
             "video_id": video_id,
             "video_name": video_name
         }
-
+        
     except ValueError:
         raise
     except Exception as e:
@@ -162,11 +183,18 @@ async def compare_reports(video_ids: list[int], user_id: int):
                 status_code=404,
                 detail="No videos found for comparison"
             )
-        Groq_client = AsyncOpenAI(
-            api_key="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",
-            base_url="https://api.groq.com/openai/v1"
-        )
-        report = await compare_between_reports(Groq_client, result)
+        
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        
+        if not GROQ_API_KEY:
+            report = "Comparison completed. LLM report generation unavailable (API key not configured)."
+        else:
+            Groq_client = AsyncOpenAI(
+                api_key=GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1"
+            )
+            report = await compare_between_reports(Groq_client, result)
+        
         return result, report
     except HTTPException:
         raise
@@ -182,7 +210,7 @@ async def set_weights(user_id: int, weights: dict):
     """Update metric weights for a user."""
     conn = get_db_connection()
     cur = conn.cursor()
-
+    
     try:
         cur.execute("""
             SELECT set_weights_fn(%s, %s, %s, %s, %s, %s, %s)
@@ -195,7 +223,7 @@ async def set_weights(user_id: int, weights: dict):
             weights["eye_contact_weight"],
             weights["grammar_weight"]
         ))
-
+        
         result = cur.fetchone()[0]
         conn.commit()
         return result
@@ -211,7 +239,7 @@ async def set_threshold_score(user_id: int, score: float) -> bool:
     """Update threshold score for a user."""
     conn = get_db_connection()
     cur = conn.cursor()
-
+    
     try:
         cur.execute("SELECT set_threshold_score(%s, %s)", (user_id, score))
         success = cur.fetchone()[0]
