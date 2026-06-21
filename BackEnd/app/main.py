@@ -5,7 +5,9 @@ from .api.user_auth import router as auth_router
 from .api.metrics import router as metrics_router
 from .api.scores import router as scores_router
 from .api.reset_password import router as password_reset_router
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 app = FastAPI(
     title="interviewMe",
     docs_url="/interviewMe",
@@ -34,7 +36,7 @@ app.include_router(password_reset_router)
 app.include_router(metrics_router)
 app.include_router(scores_router)
 app.include_router(user_router)
-app.include_router(admin_router)
+app.include_router(auth_router)
 
 @app.on_event("startup")
 async def startup_event():

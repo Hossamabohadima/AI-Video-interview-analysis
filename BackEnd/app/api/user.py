@@ -1,6 +1,8 @@
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, Depends, Body
 import json
+
+from ..services.scores_service import get_video_scores
 from ..schemas.video import MetricWeights
 from ..services.user_service import (
     get_reports, 
@@ -41,7 +43,7 @@ async def get_user_single_report(
 ):
     """Retrieve a single cached video report with scores and analysis."""
     try:
-        report_data = await get_single_report(video_id, current_user["user_id"])
+        report_data = await get_video_scores(video_id, current_user["user_id"])
         return report_data
     except ValueError as e:
         raise HTTPException(
