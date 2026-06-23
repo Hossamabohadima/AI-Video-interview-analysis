@@ -19,3 +19,6 @@ audio/
 videos/
 **/audio/**
 **/videos/**
+
+# Local environment variables
+.env
