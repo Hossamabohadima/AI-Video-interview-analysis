@@ -2,11 +2,14 @@ from openai import AsyncOpenAI
 import psycopg2
 import psycopg2.extras
 import os
+from dotenv import load_dotenv
 
 from ..services.report import video_report
 from ..db import get_db_connection
 from ..schemas.video import Scores
 
+
+load_dotenv()
 
 def _safe_float(value, default=0.0):
     """Safely convert a value to float, handling None."""
