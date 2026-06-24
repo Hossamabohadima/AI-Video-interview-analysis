@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, status
-import traceback  # Add this
 from ..schemas.reset_password import ForgotPasswordRequest, ResetPasswordRequest, PasswordResetResponse
 from ..services.reset_password import create_password_reset_token, reset_password
 
@@ -8,25 +7,27 @@ router = APIRouter(prefix="/users/auth", tags=["authentication"])
 
 @router.post("/forgot-password", response_model=PasswordResetResponse, status_code=status.HTTP_200_OK)
 async def forgot_password(request: ForgotPasswordRequest):
-    """Request a password reset link."""
+    """Request a password reset link. Email will be sent if account exists."""
     try:
         token = await create_password_reset_token(request.email)
         
-        if token:
-            print(f"[DEV] Password reset token for {request.email}: {token}")
+        # Reject if email doesn't exist in database
+        if token is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No account found with this email address"
+            )
         
         return PasswordResetResponse(
-            message="If an account with that email exists, a password reset link has been sent."
+            message="Password reset link has been sent to your email."
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        # Log the REAL error
-        print(f"[ERROR] forgot_password: {str(e)}")
-        traceback.print_exc()  # This prints the full stack trace
-        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred: {str(e)}"  # Show real error in response (dev only)
+            detail="An error occurred while processing your request"
         )
 
 
@@ -45,9 +46,7 @@ async def reset_password_endpoint(request: ResetPasswordRequest):
             detail=str(e)
         )
     except Exception as e:
-        print(f"[ERROR] reset_password: {str(e)}")
-        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred: {str(e)}"
+            detail="An error occurred while resetting your password"
         )

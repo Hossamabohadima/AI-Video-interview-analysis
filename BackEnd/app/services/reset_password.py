@@ -3,8 +3,10 @@ import secrets
 import hashlib
 import psycopg2
 import psycopg2.extras
+import os
 from ..db import get_db_connection
 from ..utils.security import hash_password
+from ..services.email_service import get_email_service
 
 
 RESET_TOKEN_EXPIRE_HOURS = 1
@@ -20,19 +22,77 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _build_reset_link(token: str) -> str:
+    """Build the password reset link for the frontend."""
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    return f"{frontend_url}/reset-password?token={token}"
+
+
+def _send_reset_email(email: str, token: str) -> bool:
+    """Send password reset email to user."""
+    try:
+        # Read email template
+        template_path = os.path.join(
+            os.path.dirname(__file__), "..", "templates", "reset_password_email.html"
+        )
+        
+        html_template = ""
+        if os.path.exists(template_path):
+            with open(template_path, "r", encoding="utf-8") as f:
+                html_template = f.read()
+        else:
+            # Fallback template if file doesn't exist
+            html_template = """
+            <h1>Password Reset - InterviewMe</h1>
+            <p>Click <a href="{reset_link}">here</a> to reset your password.</p>
+            <p>Or use this token: {token}</p>
+            <p>This link expires in 1 hour.</p>
+            """
+        
+        reset_link = _build_reset_link(token)
+        
+        # Replace placeholders
+        html_body = html_template.replace("{{ reset_link }}", reset_link)
+        html_body = html_body.replace("{{ reset_token }}", token)
+        
+        email_service = get_email_service()
+        return email_service.send_email(
+            to_email=email,
+            subject="🔐 Reset Your InterviewMe Password",
+            html_body=html_body,
+            text_body=f"""
+            Password Reset - InterviewMe
+            
+            We received a request to reset your password.
+            
+            Click this link to reset: {reset_link}
+            
+            Or use this token: {token}
+            
+            This link expires in 1 hour.
+            """
+        )
+        
+    except Exception as e:
+        print(f"Failed to send reset email: {e}")
+        return False
+
+
 async def create_password_reset_token(email: str) -> str:
-    """Create a password reset token for the given email."""
+    """Create a password reset token and send email."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
-        cur.execute("SELECT userid FROM Users WHERE email = %s", (email,))
+        cur.execute("SELECT userid, name FROM Users WHERE email = %s", (email,))
         user = cur.fetchone()
         
         if not user:
+            print(f"[INFO] Password reset requested for non-existent email: {email}")
             return None
         
         user_id = user["userid"]
+        user_name = user.get("name", "User")
         raw_token = _generate_reset_token()
         hashed_token = _hash_token(raw_token)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRE_HOURS)
@@ -48,6 +108,15 @@ async def create_password_reset_token(email: str) -> str:
         """, (user_id, hashed_token, expires_at))
         
         conn.commit()
+        
+        # Send email
+        email_sent = _send_reset_email(email, raw_token)
+        
+        if email_sent:
+            print(f"[INFO] Password reset email sent to {email}")
+        else:
+            print(f"[WARNING] Failed to send email to {email}. Token: {raw_token}")
+        
         return raw_token
         
     except psycopg2.Error as e:
