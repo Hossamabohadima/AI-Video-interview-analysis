@@ -213,7 +213,7 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     fillers_score = max(0.0, 1.0 - (filler_rate_pct / 100.0))
 
     pause_rate_pct = text_results.get("pause_rate", 0.0) or 0.0
-    pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0), 1.0)
+    pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0)+0.1, 1.0)
 
     grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
@@ -242,7 +242,7 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         energy_pct = (avg_energy / max_energy) * 100.0
     else:
         energy_pct = 0.0
-    energy_score = min(max(energy_pct / 100.0, 0.0), 1.0)
+    energy_score = min(1 - max(energy_pct / 100.0, 0.0), 1.0)
 
     try:
         total_score = (
