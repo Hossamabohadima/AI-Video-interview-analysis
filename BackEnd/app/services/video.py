@@ -19,6 +19,9 @@ import json
 import whisper
 import subprocess
 import mediapipe as mp
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def _extract_audio_from_video(video_path: str) -> str:
@@ -118,7 +121,6 @@ def _insert_scores(video_id: int, scores: Scores, cur=None, conn=None):
         conn = get_db_connection()
         cur = conn.cursor()
     try:
-       # Using cur.execute with the CALL keyword
         query = """
         CALL insert_video_scores(%s, %s, %s, %s, %s, %s, %s, %s);
         """
@@ -203,37 +205,19 @@ def _insert_or_update_video_analysis(
 
 
 def scoring(facial_results: dict, audio_results: dict, text_results: dict, weights: MetricWeights, video_id: int) -> Scores:
-    """Compute the final Scores object from analysis results and user weights.
-
-    All returned scores are normalized to the range 0.0 - 1.0 to match schema expectations. The total_score is a weighted average of the individual metrics, also normalized to 0.0 - 1.0.
-    """
-
-    # -------------------------------------------------------
-    # Text-based metrics
-    # -------------------------------------------------------
+    """Compute the final Scores object from analysis results and user weights."""
 
     total_words = text_results.get("total_words", 0) or 0
     filler_count = text_results.get("filler_count", 0) or 0
-    # filler rate in percent
     filler_rate_pct = (filler_count / total_words) * 100 if total_words > 0 else 0.0
-    # fewer fillers => higher score (1.0 is best, 0.0 is worst)
     fillers_score = max(0.0, 1.0 - (filler_rate_pct / 100.0))
 
-    # Pause / rate-of-stop: text_results should provide a pause quality percent (0-100)
     pause_rate_pct = text_results.get("pause_rate", 0.0) or 0.0
     pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0), 1.0)
 
-    # Grammar: text_results returns grammar_score already normalized to 0.0 - 1.0
     grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
-
-    # -------------------------------------------------------
-    # Facial-based metrics
-    # -------------------------------------------------------
-
-    # Facial emotions: Averages DeepFace from facial_results["face_emotions"]
     emotions = facial_results.get("face_emotions", {}) or {}
-    # normalize missing keys to 0
     happy = float(emotions.get("happy", 0.0))
     neutral = float(emotions.get("neutral", 0.0))
     surprise = float(emotions.get("surprise", 0.0))
@@ -242,23 +226,15 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     fear = float(emotions.get("fear", 0.0))
     sad = float(emotions.get("sad", 0.0))
 
-    # the emotion score is a simple weighted combination of positive vs negative emotions, normalized to 0..1
     positive = happy + neutral + 0.5 * surprise
     negative = angry + disgust + 0.8 * fear + 0.9 * sad
     raw_emotion_score = positive / (positive + negative) * 100.0 if (positive + negative) > 0 else 0.0
-    # ensure emotion score is between 0 and 100 before normalizing to 0..1
     emotion_pct = max(0.0, min(raw_emotion_score, 100.0))
     emotion_score = emotion_pct / 100.0
 
-
-    # Eye contact: facial_results provides a 0..1 score from the analyzer
     eye_contact_raw = facial_results.get("eye_contact_score", 0.0) or 0.0
     eye_contact_score = min(max(float(eye_contact_raw), 0.0), 1.0)
 
-
-
-
-    # Energy: use average / max to compute relative energy percentage
     energy_stats = audio_results.get("energy_stats", {}) or {}
     avg_energy = float(energy_stats.get("average_energy", 0.0) or 0.0)
     max_energy = float(energy_stats.get("max_energy", 0.0) or 0.0)
@@ -268,8 +244,6 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         energy_pct = 0.0
     energy_score = min(max(energy_pct / 100.0, 0.0), 1.0)
 
-
-    # Compute weighted total_score (weights expected 0..1)
     try:
         total_score = (
             fillers_score * float(weights.fillers_weight)
@@ -281,11 +255,9 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         )
     except Exception as e:
         print(f"Error computing total score for video {video_id}: {e}")
-        # If weights are missing or invalid, back to equal weighting
         components = [fillers_score, pause_rate_score, emotion_score, energy_score, eye_contact_score, grammar_score]
         total_score = sum(components) / len(components) if components else 0.0
 
-    # Clamp final total to 0..1
     total_score = min(max(float(total_score), 0.0), 1.0)
 
     return Scores(
@@ -299,7 +271,9 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
         video_id=video_id
     )
 
-def _process_video_sync(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) ->  dict:
+
+def _process_video_sync(video_id: int, weights: MetricWeights | None = None, video_path: str | None = None) -> dict:
+    """Process a video and return scores + report. Raises exception on failure."""
     if video_path is None:
         file_name = _get_video_filename(video_id)
         if not file_name:
@@ -314,8 +288,7 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
 
     audio_path = None
     try:
-        # 1. Load dependencies for model initialization
-        # Load Face Landmarker configuration
+        # 1. Load Face Landmarker configuration
         model_path = '../AI/face_landmarker.task'
         BaseOptions = mp.tasks.BaseOptions
         FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
@@ -328,26 +301,25 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
             output_face_blendshapes=True,
         )
 
-        # Load Grammar Tool for text analysis (handle grammar_mistakes dependencies)
+        # 2. Load Grammar Tool
         grammar_tool = None
         try:
             grammar_tool = language_tool_python.LanguageTool('en-US')
-        except ImportError:
-            print("Warning: language-tool-python not installed. Grammar analysis will be skipped.")
         except Exception as e:
             print(f"Warning: Failed to initialize grammar tool: {e}")
 
-        # 2. Extract raw data (Audio and Transcription)
+        # 3. Extract audio and transcribe
         audio_path = _extract_audio_from_video(video_path)
-        whisper_model = whisper.load_model("medium.en")  # type: ignore
+        
+        # Use base.en for reliability (smaller, faster, avoids checksum issues)
+        whisper_model = whisper.load_model("base.en")
         whisper_result = whisper_model.transcribe(audio_path, word_timestamps=True)
 
-        # 3. Instantiate models with injected dependencies
+        # 4. Run analysis models
         facial_model = FacialAnalysis(face_options=face_options)
         audio_model = AudioAnalysis()
         text_model = TextAnalysis(grammar_tool=grammar_tool)
 
-        # 4. Create unified input object
         analysis_input = AnalysisInput(
             audio_path=audio_path,
             video_path=video_path,
@@ -367,6 +339,7 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
             audio_results = future_audio.result()
         
         scores = scoring(facial_results, audio_results, text_results, weights, video_id=video_id)
+        # 5. Save to database
         conn = get_db_connection()
         cur = conn.cursor()
         try:
@@ -384,8 +357,8 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
             )
             _insert_scores(video_id, scores, cur=cur, conn=conn)
             conn.commit()
-        except Exception:
-            print(f"Error inserting analysis results for video {video_id}")
+        except Exception as e:
+            print(f"Error inserting analysis results for video {video_id}: {e}")
             conn.rollback()
             raise
         finally:
@@ -416,20 +389,9 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
 
     except Exception as e:
         print(f"Error processing video {video_id}: {e}")
-        # Return default scores to prevent crash
-        return {
-            "scores": Scores(
-            video_id=video_id,
-            fillers_score=0.0,
-            pause_rate_score=0.0,
-            emotion_score=0.0,
-            energy_score=0.0,
-            eye_contact_score=0.0,
-            grammar_score=0.0,
-            total_score=0.0,
-        ),
-            "report": f"Error processing video {video_id}: {e}"
-        }
+        # Re-raise so caller can mark as FAILED
+        raise
+
     finally:
         if audio_path and os.path.exists(audio_path):
             try:
@@ -448,7 +410,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
 
     ext = os.path.splitext(file.filename)[1]
     unique_name = video_name + "_" + str(uuid.uuid4()) + ext
-    unique_name = unique_name[:50]  # Truncate to 50 chars
+    unique_name = unique_name[:50]
     output_path = os.path.join(folder, unique_name)
 
     duration = 0.0
@@ -495,7 +457,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
         cur.close()
         conn.close()
 
-        # Run video standardization in thread pool (CPU-intensive)
+        # Standardize video
         unique_standardized_path = os.path.join("videos", f"standardized_{uuid.uuid4()}.mp4")
         standardized_path = await run_in_threadpool(
             standardize_video, output_path, unique_standardized_path
@@ -514,7 +476,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
         else:
             raise ValueError("Video standardization failed")
 
-        # Run video processing in thread pool (CPU-intensive)
+        # Process video - raises exception on failure
         result = await run_in_threadpool(
             _process_video_sync,
             video_id,
@@ -522,10 +484,7 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
             output_path
         )
         
-        if result["scores"] is None:
-            _update_video_status(video_id, "FAILED")
-            raise RuntimeError(f"Failed to process video {video_id}")
-
+        # Success - mark as DONE
         _update_video_status(video_id, "DONE")
         
         return {
@@ -538,17 +497,19 @@ async def handle_uploaded_video(file: UploadFile, user_id: int, video_name: str,
         }
 
     except Exception as e:
+        # Clean up file
         if os.path.exists(output_path):
             try:
                 os.remove(output_path)
             except OSError:
                 pass
 
+        # Mark as FAILED
         if video_id is not None:
             try:
                 _update_video_status(video_id, "FAILED")
             except Exception:
                 pass
 
+        # Re-raise the original error
         raise
-
