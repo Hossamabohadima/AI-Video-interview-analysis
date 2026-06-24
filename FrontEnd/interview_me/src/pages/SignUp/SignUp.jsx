@@ -206,7 +206,7 @@ const [userType, setUserType] = useState(
 
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/sign-in")}
               className="w-full border-2 border-[#009986] text-[#009986] font-bold text-lg py-2.5 rounded-2xl text-center hover:bg-[#e5e4e2] transition-colors"
             >
               Log in

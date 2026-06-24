@@ -7,7 +7,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => localStorage.getItem("access_token") || localStorage.getItem("token");
 
 const request = async (endpoint, options = {}) => {
   const token = getToken();

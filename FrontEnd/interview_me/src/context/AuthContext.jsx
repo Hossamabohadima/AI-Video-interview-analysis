@@ -26,7 +26,8 @@ const getRoleLabel = (role = "") => {
 };
 
 const persistAuth = (user, token) => {
-  localStorage.setItem("token", token);
+    localStorage.setItem("access_token", token);
+    localStorage.setItem("token", token);
   localStorage.setItem("user",  JSON.stringify(user));
 };
 
@@ -71,9 +72,9 @@ export const AuthProvider = ({ children }) => {
         user_id:   tokenData.user_id,
         role:      tokenData.role,
         roleLabel: getRoleLabel(tokenData.role),
-        name:      email.split("@")[0],
+        name:      localStorage.getItem("name") || tokenData.name || email.split("@")[0],
         email,
-        initials:  getInitials(email.split("@")[0]),
+        initials:  getInitials(localStorage.getItem("name") || tokenData.name || email.split("@")[0]),
       };
 
       persistAuth(user, tokenData.access_token);
