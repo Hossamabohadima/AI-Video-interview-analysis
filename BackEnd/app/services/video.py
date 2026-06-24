@@ -391,10 +391,18 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
         finally:
             cur.close()
             conn.close()
-        Groq_client = AsyncOpenAI(
-    api_key="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",
-    base_url="https://api.groq.com/openai/v1"
-)       
+            
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        if not GROQ_API_KEY:
+            report = "Video analysis completed successfully. LLM report generation unavailable (API key not configured)."
+        else:
+            Groq_client = AsyncOpenAI(
+                api_key=GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1"
+            )
+            
+ 
+        
         report = asyncio.run(video_report(Groq_client, scores, {
             "text_results": text_results,
             "facial_results": facial_results,
