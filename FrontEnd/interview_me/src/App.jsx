@@ -36,11 +36,11 @@ const AppRoutes = () => (
 
     // Protected routes
     <Route 
-      path="/history" 
+      path="/candidate-history" 
       element={<ProtectedRoute><CandidateHistoryPage /></ProtectedRoute>} />
     
     <Route 
-      path="/report" 
+      path="/candidate-report" 
       element={<ProtectedRoute><CandidateReportPage /></ProtectedRoute>} />
     
     <Route 

@@ -7,6 +7,7 @@ from ..models.facial_analysis import FacialAnalysis
 from ..models.audio_analysis import AudioAnalysis
 from ..models.text_analysis import TextAnalysis
 from .video_standardize import standardize_video
+from concurrent.futures import ThreadPoolExecutor
 from ..db import get_db_connection
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
@@ -329,6 +330,17 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
         text_results = text_model.analyze(analysis_input)
         facial_results = facial_model.analyze(analysis_input)
         audio_results = audio_model.analyze(analysis_input)
+        # 5. Execute analysis in parallel using a ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit all three tasks to the pool concurrently
+            future_text = executor.submit(text_model.analyze, analysis_input)
+            future_facial = executor.submit(facial_model.analyze, analysis_input)
+            future_audio = executor.submit(audio_model.analyze, analysis_input)
+
+            # Gather the results as they finish (.result() blocks until that specific thread completes)
+            text_results = future_text.result()
+            facial_results = future_facial.result()
+            audio_results = future_audio.result()
         
         scores = scoring(facial_results, audio_results, text_results, weights, video_id=video_id)
         

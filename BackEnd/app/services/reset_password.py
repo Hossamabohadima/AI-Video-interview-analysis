@@ -85,7 +85,6 @@ async def validate_reset_token(token: str) -> int:
         if record["used"]:
             raise ValueError("Reset token has already been used")
         
-        # Fix: Handle timezone-naive datetime from PostgreSQL
         expires_at = record["expires_at"]
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)

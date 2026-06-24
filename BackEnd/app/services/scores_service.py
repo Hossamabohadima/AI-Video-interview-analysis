@@ -3,6 +3,7 @@ import psycopg2
 import psycopg2.extras
 import os
 from dotenv import load_dotenv
+
 from ..services.report import video_report
 from ..db import get_db_connection
 from ..schemas.video import Scores
@@ -46,7 +47,6 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
         score_data = scores_list[0]
         analysis_data = analysis_list[0]
         
-        # Use safe_float to handle None values
         score = Scores(
             fillers_score=_safe_float(score_data.get("fillers_score"), 0.0),
             pause_rate_score=_safe_float(score_data.get("pause_rate_score"), 0.0),
@@ -59,20 +59,23 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
         )
         
         GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-        Groq_client = AsyncOpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
-        )
         
-        report = await video_report(groq_client, score, {
-            "fillers_words": analysis_data.get("fillers_Word") or {},
-            "rate_of_stop": _safe_float(analysis_data.get("rate_Of_Stop"), 0.0),
-            "emotion_analysis": analysis_data.get("emotion_analysis") or {},
-            "energy_statistics": analysis_data.get("energy_Statistics") or {},
-            "eye_contact": analysis_data.get("eye_Contact") or {},
-            "grammar_mistakes": analysis_data.get("grammar_Mistakes") or [],
-        })
+        if not GROQ_API_KEY:
+            report = "Video analysis completed. LLM report generation unavailable (API key not configured)."
+        else:
+            groq_client = AsyncOpenAI(
+                api_key=GROQ_API_KEY,
+                base_url="https://api.groq.com/openai/v1"
+            )
+            
+            report = await video_report(groq_client, score, {
+                "fillers_words": analysis_data.get("fillers_Word") or {},
+                "rate_of_stop": _safe_float(analysis_data.get("rate_Of_Stop"), 0.0),
+                "emotion_analysis": analysis_data.get("emotion_analysis") or {},
+                "energy_statistics": analysis_data.get("energy_Statistics") or {},
+                "eye_contact": analysis_data.get("eye_Contact") or {},
+                "grammar_mistakes": analysis_data.get("grammar_Mistakes") or [],
+            })
         
         return {"score": score, "report": report}
         

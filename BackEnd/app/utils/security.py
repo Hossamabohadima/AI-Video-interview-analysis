@@ -14,9 +14,7 @@ _token_blacklist = set()
 
 def hash_password(password: str) -> str:
     """Hash password using bcrypt. Truncates to 72 bytes as bcrypt requires."""
-    # Truncate to 72 bytes (bcrypt limit)
     password_bytes = password[:72].encode('utf-8')
-    # Generate salt and hash
     salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
@@ -24,7 +22,6 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash using bcrypt."""
-    # Truncate to 72 bytes to match hashing
     plain_bytes = plain_password[:72].encode('utf-8')
     hashed_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(plain_bytes, hashed_bytes)
@@ -55,12 +52,8 @@ def verify_token(token: str) -> dict:
 
 
 def blacklist_token(token: str) -> bool:
-    """Add a token to the blacklist to prevent reuse after logout.
-
-    In production, use Redis or database-backed storage.
-    """
+    """Add a token to the blacklist to prevent reuse after logout."""
     try:
-        # Verify token is valid before blacklisting
         payload = verify_token(token)
         _token_blacklist.add(token)
         return True
