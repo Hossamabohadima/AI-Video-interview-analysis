@@ -20,7 +20,7 @@ const DROPDOWN_ITEMS = [
   },
   {
     label: "View my report",
-    href:  "/history",
+    href:  "/candidate-history",
     icon:  historyIcon,
   },
 ];

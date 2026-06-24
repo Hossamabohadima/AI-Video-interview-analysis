@@ -115,7 +115,7 @@ function SessionCard({ session }) {
 
       <div className="flex min-w-[90px] flex-col items-end gap-2">
         <Link
-          to={`/report/${session.id}`}
+          to={`/candidate-report/${session.id}`}
           state={{ session }}
           className="rounded-full border border-[#0FA99D] bg-white px-3 py-1.5 text-[10px] font-bold text-[#0FA99D] hover:bg-[#F0FDFA]"
         >
@@ -516,7 +516,7 @@ function CandidateHistoryPage() {
             </Link>
 
             <Link
-              to="/history"
+              to="/candidate-history"
               className="flex w-full items-center gap-2 rounded-full bg-[#E8FBF7] px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
             >
               <span className="inline-flex h-6 w-6 items-center justify-center">

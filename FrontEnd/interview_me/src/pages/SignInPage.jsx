@@ -70,7 +70,7 @@ function SignInPage() {
       return;
     }
 
-    navigate("/history");
+    navigate("/candidate-history");
   };
 
   const handleLogin = async (event) => {

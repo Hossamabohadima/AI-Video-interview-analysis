@@ -40,7 +40,7 @@ const AppRoutes = () => (
       element={<ProtectedRoute><CandidateHistoryPage /></ProtectedRoute>} />
     
     <Route 
-      path="/candidate-report" 
+      path="/candidate-report/:id" 
       element={<ProtectedRoute><CandidateReportPage /></ProtectedRoute>} />
     
     <Route 

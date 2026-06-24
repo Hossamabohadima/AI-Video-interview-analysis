@@ -579,7 +579,7 @@ function ProcessVideoPage() {
 
       localStorage.setItem("candidateReportData", JSON.stringify(data));
 
-      navigate("/history", { state: { reportData: data } });
+      navigate("/candidate-history", { state: { reportData: data } });
     } catch (error) {
       console.error("Upload error:", error);
       alert(`Failed to process video(s).\n${error.message}`);
@@ -661,7 +661,7 @@ function ProcessVideoPage() {
               label="Analyze Interview"
               to="/process-video"
             />
-            <SidebarItem icon={<HistoryIcon />} label="History" to="/history" />
+            <SidebarItem icon={<HistoryIcon />} label="History" to="/candidate-history" />
           </nav>
         </aside>
 

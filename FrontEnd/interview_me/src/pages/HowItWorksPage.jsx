@@ -57,7 +57,7 @@ function HowItWorksPage() {
       return;
     }
 
-    navigate("/history");
+    navigate("/candidate-history");
   };
 
   const navItems = [
