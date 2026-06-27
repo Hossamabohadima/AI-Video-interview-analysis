@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Spinner from "../components/UI/Spinner";
+
 
 function formatDate(dateString) {
   const date = new Date(dateString);
@@ -629,9 +631,10 @@ function CandidateHistoryPage() {
 
               <div className="mt-4 flex flex-col gap-3">
                 {loading ? (
-                  <div className="rounded-[16px] border border-[#ECECEC] bg-white px-6 py-10 text-center text-[12px] text-[#9CA3AF]">
-                    Loading sessions...
-                  </div>
+                  <Spinner
+                    message="Processing your videos..."
+                    submessage="This may take a few minutes depending on video length"
+                  />
                 ) : error ? (
                   <div className="rounded-[16px] border border-[#FECACA] bg-white px-6 py-10 text-center text-[12px] text-red-500">
                     {error}

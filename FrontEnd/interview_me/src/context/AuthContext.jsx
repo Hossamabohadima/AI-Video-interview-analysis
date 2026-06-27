@@ -1,16 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { login as apiLogin, signUp as apiSignUp } from "../services/api";
-
-/**
- * AuthContext
- * Global authentication state using real JWT backend.
- *
- * Token shape from backend:
- * { access_token, token_type: "bearer", user_id, role }
- *
- * User shape stored in context:
- * { user_id, name, email, role, roleLabel, initials }
- */
+import { login as apiLogin, signUp as apiSignUp, logoutApi } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -26,14 +15,22 @@ const getRoleLabel = (role = "") => {
 };
 
 const persistAuth = (user, token) => {
-    localStorage.setItem("access_token", token);
-    localStorage.setItem("token", token);
-  localStorage.setItem("user",  JSON.stringify(user));
+  localStorage.setItem("access_token", token);
+  localStorage.setItem("token",        token); // keep for compatibility
+  localStorage.setItem("user",         JSON.stringify(user));
+  localStorage.setItem("name",         user.name);
+  localStorage.setItem("role",         user.role);
+  localStorage.setItem("user_id",      String(user.user_id));
 };
 
 const clearAuth = () => {
+  localStorage.removeItem("access_token");
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  localStorage.removeItem("name");
+  localStorage.removeItem("role");
+  localStorage.removeItem("user_id");
+  localStorage.removeItem("token_type");
 };
 
 const loadPersistedUser = () => {
@@ -54,7 +51,7 @@ export const AuthProvider = ({ children }) => {
 
   // Rehydrate from localStorage on mount
   useEffect(() => {
-    const token      = localStorage.getItem("token");
+    const token      = localStorage.getItem("access_token") || localStorage.getItem("token");
     const cachedUser = loadPersistedUser();
     if (token && cachedUser) setUser(cachedUser);
     setIsLoading(false);
@@ -65,16 +62,15 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     setIsLoading(true);
     try {
-      // POST /users/auth/login → { access_token, token_type, user_id, role }
       const tokenData = await apiLogin({ email, password });
 
       const user = {
         user_id:   tokenData.user_id,
         role:      tokenData.role,
         roleLabel: getRoleLabel(tokenData.role),
-        name:      localStorage.getItem("name") || tokenData.name || email.split("@")[0],
+        name:      tokenData.name || localStorage.getItem("name") || email.split("@")[0],
         email,
-        initials:  getInitials(localStorage.getItem("name") || tokenData.name || email.split("@")[0]),
+        initials:  getInitials(tokenData.name || email.split("@")[0]),
       };
 
       persistAuth(user, tokenData.access_token);
@@ -93,7 +89,6 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     setIsLoading(true);
     try {
-      // Map frontend fields → backend Registration schema
       const payload = {
         name:         userData.fullName  || userData.name,
         email:        userData.email,
@@ -102,7 +97,6 @@ export const AuthProvider = ({ children }) => {
         role:         userData.userType === "Company" ? "RECRUITER" : "USER",
       };
 
-      // POST /users/auth/signup → { user_id, name, email, role, created_date }
       const newUser = await apiSignUp(payload);
 
       // Auto-login after signup to get token
@@ -133,10 +127,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Logout ────────────────────────────────────────────────────────────────
-  const logout = useCallback(() => {
-    clearAuth();
-    setUser(null);
+  const logout = useCallback(async () => {
     setError(null);
+    try {
+      // Blacklist token on backend
+      await logoutApi();
+    } catch {
+      // Even if backend call fails, clear local auth
+    } finally {
+      clearAuth();
+      setUser(null);
+    }
   }, []);
 
   const value = {

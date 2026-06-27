@@ -9,6 +9,8 @@ import useMobileMenu    from "../../hooks/useMobileMenu";
 import usePagination    from "../../hooks/usePagination";
 import { useAuth }      from "../../context/AuthContext";
 import { getBatches }   from "../../services/api";
+import Spinner from "../../components/UI/Spinner";
+
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
@@ -105,7 +107,7 @@ export const RecruiterHistory = () => {
       <DashboardSidebar isOpen={isOpen} onClose={close} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onMenuToggle={toggle} user={headerUser} />
+        <DashboardHeader onMenuToggle={toggle} />
 
         <main className="flex-1 p-4 md:p-8 space-y-6 overflow-y-auto max-w-7xl w-full mx-auto">
 
@@ -189,7 +191,7 @@ export const RecruiterHistory = () => {
 
                         {/* Batch — show date + time + candidate names preview */}
                         <td className="py-4 px-6 text-left">
-                          <div className="font-medium text-sm text-gray-900">{batch.date} {batch.time}</div>
+                          <div className="font-medium text-sm text-gray-900">{batch.batchRole}</div>
                           <div className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">
                             {batch.videoNames.slice(0, 3).join(", ")}
                             {batch.videoNames.length > 3 && ` +${batch.videoNames.length - 3} more`}

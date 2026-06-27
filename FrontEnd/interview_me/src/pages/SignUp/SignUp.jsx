@@ -104,7 +104,7 @@ const [userType, setUserType] = useState(
     try {
       await signUp({ ...formState, userType });
       // Redirect to history page after successful signup
-      navigate("/recruiter-history");
+      navigate("/sign-in");
     } catch {
       // authError from context handles display
     }

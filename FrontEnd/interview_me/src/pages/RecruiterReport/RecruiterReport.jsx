@@ -1,15 +1,16 @@
 import { useState, useEffect, useMemo, useId } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
-import DashboardSidebar from "../../components/DashboardSidebar/DashboardSidebar";
-import DashboardHeader  from "../../components/DashboardHeader/DashboardHeader";
-import ScoreBar         from "../../components/ui/ScoreBar";
-import StatCard         from "../../components/ui/StatCard";
-import Pagination       from "../../components/ui/Pagination";
+import DashboardSidebar  from "../../components/DashboardSidebar/DashboardSidebar";
+import DashboardHeader   from "../../components/DashboardHeader/DashboardHeader";
+import ScoreBar          from "../../components/ui/ScoreBar";
+import StatCard          from "../../components/ui/StatCard";
+import Pagination        from "../../components/ui/Pagination";
+import Spinner from "../../components/UI/Spinner";
 
-import useMobileMenu    from "../../hooks/useMobileMenu";
-import usePagination    from "../../hooks/usePagination";
-import { useAuth }      from "../../context/AuthContext";
+import useMobileMenu     from "../../hooks/useMobileMenu";
+import usePagination     from "../../hooks/usePagination";
+import { useAuth }       from "../../context/AuthContext";
 import { getMultipleVideoScores, getReports, updateThreshold } from "../../services/api";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -33,18 +34,14 @@ const SCORE_BUCKETS = ["0–20", "20–40", "40–60", "60–80", "80–100"];
 
 const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 
-/**
- * Enrich candidates with rank and pass/fail status.
- * Scores from backend are 0.0–1.0, converted to 0–100 for display.
- */
 const enrichCandidates = (rawScores, videoNames, threshold) =>
   rawScores
     .map((s, i) => ({
-      id:       s.video_id,
-      name:     videoNames[i] || `Candidate ${i + 1}`,
-      overall:  Math.round((s.total_score || 0) * 100),
-      scores:   MODULE_LABELS.map((m) => Math.round((s[m.key] || 0) * 100)),
-      status:   Math.round((s.total_score || 0) * 100) >= threshold ? "PASS" : "FAIL",
+      id:      s.video_id,
+      name:    videoNames[i] || `Candidate ${i + 1}`,
+      overall: Math.round((s.total_score || 0) * 100),
+      scores:  MODULE_LABELS.map((m) => Math.round((s[m.key] || 0) * 100)),
+      status:  Math.round((s.total_score || 0) * 100) >= threshold ? "PASS" : "FAIL",
     }))
     .sort((a, b) => b.overall - a.overall)
     .map((c, i) => ({ ...c, rank: i + 1 }));
@@ -66,20 +63,18 @@ export const RecruiterReport = () => {
   const [searchParams]            = useSearchParams();
   const navigate                  = useNavigate();
 
-  // Read video IDs from URL: /recruiter-report?ids=1,2,3,4
-  const idsParam   = searchParams.get("ids") || "";
-  const videoIds   = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : [];
+  const idsParam = searchParams.get("ids") || "";
+  const videoIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : [];
 
-  const [rawScores,      setRawScores]      = useState([]);
-  const [videoNames,     setVideoNames]     = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [error,          setError]          = useState(null);
-  const [threshold,      setThreshold]      = useState(DEFAULT_THRESHOLD);
-  const [thresholdInput, setThresholdInput] = useState(String(DEFAULT_THRESHOLD));
-  const [savingThreshold, setSavingThreshold] = useState(false);
-  const [thresholdSaved,  setThresholdSaved]  = useState(false);
+  const [rawScores,       setRawScores]       = useState([]);
+  const [videoNames,      setVideoNames]       = useState([]);
+  const [loading,         setLoading]          = useState(true);
+  const [error,           setError]            = useState(null);
+  const [threshold,       setThreshold]        = useState(DEFAULT_THRESHOLD);
+  const [thresholdInput,  setThresholdInput]   = useState(String(DEFAULT_THRESHOLD));
+  const [savingThreshold, setSavingThreshold]  = useState(false);
+  const [thresholdSaved,  setThresholdSaved]   = useState(false);
 
-  // ── Fetch all scores for the batch ───────────────────────────────────────
   useEffect(() => {
     if (videoIds.length === 0) {
       setError("No videos selected. Go back to history and click View Report.");
@@ -89,19 +84,19 @@ export const RecruiterReport = () => {
 
     const fetchData = async () => {
       try {
-        // Fetch scores for all videos in parallel
         const scores = await getMultipleVideoScores(videoIds);
-
-        // Get video names from reports
         const { reports } = await getReports();
         const nameMap = {};
         if (reports) {
-          reports.forEach((r) => { nameMap[r.videoid] = r.videoname; });
+          reports.forEach((r) => {
+            const cleanName = r.videoname
+              .replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*$/i, "")
+              .replace(/_video$/, "")
+              .trim();
+            nameMap[r.videoid] = cleanName;
+          });
         }
-
-        // Order names to match video IDs order
         const names = videoIds.map((id) => nameMap[id] || `Candidate ${id}`);
-
         setRawScores(scores);
         setVideoNames(names);
       } catch (err) {
@@ -114,20 +109,18 @@ export const RecruiterReport = () => {
     fetchData();
   }, [idsParam]);
 
-  // ── Derived data ─────────────────────────────────────────────────────────
   const candidates   = useMemo(() => enrichCandidates(rawScores, videoNames, threshold), [rawScores, videoNames, threshold]);
   const distribution = useMemo(() => calcDistribution(candidates), [candidates]);
   const maxBucket    = Math.max(...distribution.map((b) => b.count), 1);
 
-  const passed      = candidates.filter((c) => c.status === "PASS");
-  const failed      = candidates.filter((c) => c.status === "FAIL");
-  const allScores   = candidates.map((c) => c.overall);
+  const passed       = candidates.filter((c) => c.status === "PASS");
+  const failed       = candidates.filter((c) => c.status === "FAIL");
+  const allScores    = candidates.map((c) => c.overall);
   const topCandidate = candidates[0];
-  const batchAvg    = avg(allScores);
-  const passRate    = candidates.length ? ((passed.length / candidates.length) * 100).toFixed(1) : "0.0";
-  const failRate    = candidates.length ? (100 - parseFloat(passRate)).toFixed(1) : "100.0";
+  const batchAvg     = avg(allScores);
+  const passRate     = candidates.length ? ((passed.length / candidates.length) * 100).toFixed(1) : "0.0";
+  const failRate     = candidates.length ? (100 - parseFloat(passRate)).toFixed(1) : "100.0";
 
-  // Module averages across all candidates
   const moduleAvgs = MODULE_LABELS.map((mod, i) => ({
     label: mod.label,
     value: avg(candidates.map((c) => c.scores[i])),
@@ -136,13 +129,9 @@ export const RecruiterReport = () => {
   const { paginated, currentPage, totalPages, hasNext, hasPrev, next, prev, goTo } =
     usePagination(candidates, 6);
 
-  // ── Threshold ─────────────────────────────────────────────────────────────
   const applyThreshold = async () => {
     const val = parseInt(thresholdInput, 10);
-    if (isNaN(val) || val < 0 || val > 100) {
-      setThresholdInput(String(threshold));
-      return;
-    }
+    if (isNaN(val) || val < 0 || val > 100) { setThresholdInput(String(threshold)); return; }
     setThreshold(val);
     setSavingThreshold(true);
     try {
@@ -157,24 +146,28 @@ export const RecruiterReport = () => {
   };
 
   const summaryCards = [
-    { id: "total",   title: "Total Candidates", value: String(candidates.length), subtitle: "In this batch",             valueColor: "text-gray-900",  topBorder: true },
-    { id: "passed",  title: "Passed Threshold", value: String(passed.length),     subtitle: `${passRate}% pass rate`,   valueColor: "text-gray-900",  topBorder: true },
-    { id: "avg",     title: "Average Score",    value: `${batchAvg}%`,            subtitle: "Batch average",            valueColor: "text-gray-900",  topBorder: true },
-    { id: "top",     title: "Top Score",        value: topCandidate ? `${topCandidate.overall}%` : "—", subtitle: topCandidate?.name || "—", valueColor: "text-[#009986]", topBorder: true },
+    { id: "total",  title: "Total Candidates", value: String(candidates.length), subtitle: "In this batch",           valueColor: "text-gray-900",  topBorder: true },
+    { id: "passed", title: "Passed Threshold", value: String(passed.length),     subtitle: `${passRate}% pass rate`, valueColor: "text-gray-900",  topBorder: true },
+    { id: "avg",    title: "Average Score",    value: `${batchAvg}%`,            subtitle: "Batch average",          valueColor: "text-gray-900",  topBorder: true },
+    { id: "top",    title: "Top Score",        value: topCandidate ? `${topCandidate.overall}%` : "—", subtitle: topCandidate?.name || "—", valueColor: "text-[#009986]", topBorder: true },
   ];
-
-  const headerUser = user
-    ? { name: user.name, role: user.roleLabel || user.role, initials: user.initials }
-    : { name: "Sarah Ahmed", role: "Recruiter Admin", initials: "SA" };
 
   return (
     <div className="min-h-screen bg-[#e5e4e2] flex font-sans">
       <DashboardSidebar isOpen={isOpen} onClose={close} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onMenuToggle={toggle} user={headerUser} />
+        <DashboardHeader onMenuToggle={toggle} />
 
-        <main className="flex-1 p-4 md:p-8 space-y-6 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-8 space-y-6 overflow-y-auto max-w-7xl w-full mx-auto relative">
+
+          {/* Loading overlay — covers only main content */}
+          {loading && (
+            <Spinner
+              message="Loading batch report..."
+              submessage="Fetching scores for all candidates"
+            />
+          )}
 
           {/* Report header */}
           <section className="bg-white rounded-2xl px-6 py-4 flex items-center justify-between flex-wrap gap-4 shadow-sm border border-gray-100">
@@ -183,18 +176,12 @@ export const RecruiterReport = () => {
               <p className="text-xs text-gray-400 mt-0.5">{candidates.length} candidates · {videoIds.length} videos</p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/recruiter-history")}
-                className="h-9 px-4 rounded-full border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-all"
-              >
+              <button type="button" onClick={() => navigate("/recruiter-history")}
+                className="h-9 px-4 rounded-full border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-all">
                 ← Back to History
               </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="flex items-center gap-2 h-9 px-4 rounded-full border border-gray-200 text-sm font-bold text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all"
-              >
+              <button type="button" onClick={() => window.print()}
+                className="flex items-center gap-2 h-9 px-4 rounded-full border border-gray-200 text-sm font-bold text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                 </svg>
@@ -212,7 +199,8 @@ export const RecruiterReport = () => {
           {videoIds.length === 0 && !loading && (
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
               <p className="text-gray-400 text-sm">No batch selected.</p>
-              <button onClick={() => navigate("/recruiter-history")} className="text-[#009986] font-semibold text-sm mt-2 inline-block hover:underline">
+              <button onClick={() => navigate("/recruiter-history")}
+                className="text-[#009986] font-semibold text-sm mt-2 inline-block hover:underline">
                 ← Go back to History
               </button>
             </div>
@@ -248,17 +236,11 @@ export const RecruiterReport = () => {
               </section>
 
               {/* Summary cards */}
-              {loading ? (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {Array.from({ length: 4 }).map((_, i) => <div key={i} className="bg-white rounded-2xl p-5 h-[115px] animate-pulse" />)}
-                </div>
-              ) : (
-                <section className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Batch summary">
-                  {summaryCards.map((card) => (
-                    <StatCard key={card.id} title={card.title} value={card.value} subtitle={card.subtitle} valueColor={card.valueColor} topBorder={card.topBorder} />
-                  ))}
-                </section>
-              )}
+              <section className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Batch summary">
+                {summaryCards.map((card) => (
+                  <StatCard key={card.id} title={card.title} value={card.value} subtitle={card.subtitle} valueColor={card.valueColor} topBorder={card.topBorder} />
+                ))}
+              </section>
 
               {/* Candidate ranking table + side panels */}
               <div className="flex flex-col xl:flex-row gap-6">
@@ -282,50 +264,44 @@ export const RecruiterReport = () => {
                   </div>
 
                   <div className="overflow-x-auto">
-                    {loading ? (
-                      <div className="p-8 space-y-4">
-                        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />)}
-                      </div>
-                    ) : (
-                      <table className="w-full min-w-[800px] text-left border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200">
-                            {TABLE_COLUMNS.map((col) => (
-                              <th key={col} scope="col" className="py-3 px-3 text-xs font-semibold text-[#566068] text-center whitespace-nowrap first:text-left">
-                                {col}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {paginated.map((c) => {
-                            const pass       = c.status === "PASS";
-                            const scoreColor = pass ? "text-[#009986]" : "text-gray-300";
-                            const nameColor  = pass ? "text-gray-700"  : "text-gray-300";
-                            return (
-                              <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                                <td className={`py-3 px-3 text-xs font-semibold ${nameColor}`}>{c.rank}</td>
-                                <td className={`py-3 px-3 text-xs font-semibold whitespace-nowrap ${nameColor}`}>{c.name}</td>
-                                <td className={`py-3 px-3 text-xs font-bold text-center ${scoreColor}`}>{c.overall}%</td>
-                                {c.scores.map((s, i) => (
-                                  <td key={i} className={`py-3 px-3 text-xs font-bold text-center ${scoreColor}`}>{s}%</td>
-                                ))}
-                                <td className="py-3 px-3 text-center">
-                                  <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                    pass ? "bg-teal-50 text-[#009986]" : "bg-red-50 text-[#dc143c]"
-                                  }`}>
-                                    {c.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
+                    <table className="w-full min-w-[800px] text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {TABLE_COLUMNS.map((col) => (
+                            <th key={col} scope="col" className="py-3 px-3 text-xs font-semibold text-[#566068] text-center whitespace-nowrap first:text-left">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {paginated.map((c) => {
+                          const pass       = c.status === "PASS";
+                          const scoreColor = pass ? "text-[#009986]" : "text-gray-300";
+                          const nameColor  = pass ? "text-gray-700"  : "text-gray-300";
+                          return (
+                            <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                              <td className={`py-3 px-3 text-xs font-semibold ${nameColor}`}>{c.rank}</td>
+                              <td className={`py-3 px-3 text-xs font-semibold whitespace-nowrap ${nameColor}`}>{c.name}</td>
+                              <td className={`py-3 px-3 text-xs font-bold text-center ${scoreColor}`}>{c.overall}%</td>
+                              {c.scores.map((s, i) => (
+                                <td key={i} className={`py-3 px-3 text-xs font-bold text-center ${scoreColor}`}>{s}%</td>
+                              ))}
+                              <td className="py-3 px-3 text-center">
+                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                  pass ? "bg-teal-50 text-[#009986]" : "bg-red-50 text-[#dc143c]"
+                                }`}>
+                                  {c.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
 
-                  {!loading && candidates.length > 0 && (
+                  {candidates.length > 0 && (
                     <Pagination
                       currentPage={currentPage} totalPages={totalPages}
                       hasNext={hasNext} hasPrev={hasPrev}
@@ -391,28 +367,22 @@ export const RecruiterReport = () => {
                   <h2 id="core-scores-heading" className="text-lg font-semibold text-[#009986]">6 Core Module Scores</h2>
                   <span className="text-xs text-gray-400 font-semibold">Avg. across all {candidates.length} candidates</span>
                 </div>
-                {loading ? (
-                  <div className="space-y-5">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-6 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-                ) : (
-                  <>
-                    <ul className="space-y-5">
-                      {moduleAvgs.map((mod) => (
-                        <li key={mod.label}>
-                          <span className="text-sm font-semibold text-gray-800 block mb-1.5">{mod.label}</span>
-                          <ScoreBar value={mod.value} />
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                      {moduleAvgs.map((mod) => (
-                        <div key={mod.label} className="bg-gray-50 rounded-xl p-3 text-center">
-                          <div className="text-lg font-black text-[#009986]">{mod.value}%</div>
-                          <div className="text-[10px] text-gray-400 font-semibold mt-0.5 leading-tight">{mod.label}</div>
-                        </div>
-                      ))}
+                <ul className="space-y-5">
+                  {moduleAvgs.map((mod) => (
+                    <li key={mod.label}>
+                      <span className="text-sm font-semibold text-gray-800 block mb-1.5">{mod.label}</span>
+                      <ScoreBar value={mod.value} />
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {moduleAvgs.map((mod) => (
+                    <div key={mod.label} className="bg-gray-50 rounded-xl p-3 text-center">
+                      <div className="text-lg font-black text-[#009986]">{mod.value}%</div>
+                      <div className="text-[10px] text-gray-400 font-semibold mt-0.5 leading-tight">{mod.label}</div>
                     </div>
-                  </>
-                )}
+                  ))}
+                </div>
               </section>
             </>
           )}

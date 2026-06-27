@@ -13,7 +13,7 @@ import historyIcon from "../../assets/history.svg";
  */
 
 const NAV_ITEMS = [
-  { id: "analyze-interview", label: "Analyze Interview", href: "/analyze-interview", icon: uploadIcon  },
+  { id: "analyze-interview", label: "Analyze Interview", href: "/process-video", icon: uploadIcon  },
   { id: "history",           label: "History",           href: "/recruiter-history", icon: historyIcon },
 ];
 
