@@ -117,7 +117,12 @@ export const uploadVideos = async (files, videoNames, weights) => {
 // ── SCORES ────────────────────────────────────────────────────────────────────
 
 export const getVideoScores = async (videoId) => {
-  return request(`/scores/${videoId}`);
+  const data = await request(`/scores/${videoId}`);
+  console.log(`Scores for video ${videoId}:`, JSON.stringify(data));
+  if (data && data.score) {
+    return { ...data.score, video_id: videoId };
+  }
+  return data;
 };
 
 export const getMultipleVideoScores = async (videoIds) => {
