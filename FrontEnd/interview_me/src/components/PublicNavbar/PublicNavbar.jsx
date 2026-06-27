@@ -15,12 +15,12 @@ import historyIcon from "../../assets/history.svg";
 const DROPDOWN_ITEMS = [
   {
     label: "Analyze my interview",
-    href:  "/process-video",
+    href:  "/sign-in",
     icon:  uploadIcon,
   },
   {
     label: "View my report",
-    href:  "/candidate-history",
+    href:  "/sign-in",
     icon:  historyIcon,
   },
 ];

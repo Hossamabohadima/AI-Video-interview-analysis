@@ -53,7 +53,11 @@ function SignInPage() {
       return;
     }
 
-    navigate("/process-video");
+    if (data.role === "RECRUITER") {
+      navigate("/recruiter-history");
+    } else {
+      navigate("/process-video");
+    }
   };
 
   const handleViewReportNavigation = () => {
@@ -421,10 +425,11 @@ function SignInPage() {
 
             <button
               type="button"
+              onClick={() => navigate("/forgot-password")}
               className="text-center text-[14px] text-[#8B8B8B] hover:text-[#0FA99D]"
             >
-              Forgotten password?
-            </button>
+                Forgotten password?
+              </button>
 
             <Link
               to="/signup"

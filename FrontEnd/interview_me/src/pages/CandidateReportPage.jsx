@@ -1,5 +1,7 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import Spinner from "../components/UI/Spinner";
+
 
 function SidebarItem({ active = false, icon, label, to = "#" }) {
   return (
@@ -208,9 +210,10 @@ function CandidateReportPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#E8E6E2]">
-        <div className="rounded-xl bg-white px-6 py-4 text-sm text-[#0FA99D] shadow">
-          Loading report...
-        </div>
+        <Spinner
+          message="Loading Report.."
+          submessage="Fetching scores and feedback for your video"
+        />
       </div>
     );
   }

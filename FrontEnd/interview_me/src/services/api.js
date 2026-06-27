@@ -7,7 +7,8 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-const getToken = () => localStorage.getItem("access_token") || localStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("access_token") || localStorage.getItem("token");
 
 const request = async (endpoint, options = {}) => {
   const token = getToken();
@@ -61,15 +62,26 @@ export const login = async ({ email, password }) => {
   });
 };
 
+export const logoutApi = async () => {
+  return request("/users/auth/logout", { method: "POST" });
+};
+
+export const forgotPassword = async (email) => {
+  return request("/users/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+};
+
+export const resetPassword = async (token, newPassword) => {
+  return request("/users/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+};
+
 // ── REPORTS ───────────────────────────────────────────────────────────────────
 
-/**
- * Get all video reports for the authenticated user.
- * GET /users/reports
- * Returns: { reports: [{ videoid, uploaddate, duration, status, videoname,
- *   fillers_score, pause_rate_score, emotion_score, energy_score,
- *   eye_contact_score, grammar_score, total_score }] }
- */
 export const getReports = async () => {
   return request("/users/reports");
 };
@@ -82,10 +94,6 @@ export const compareReports = async (video1, video2) => {
 
 // ── THRESHOLD ─────────────────────────────────────────────────────────────────
 
-/**
- * Update pass threshold.
- * Frontend sends 0–100, divided by 100 here → backend receives 0.0–1.0
- */
 export const updateThreshold = async (scorePercent) => {
   const score = scorePercent / 100;
   return request(`/users/threshold?score=${score}`, { method: "PUT" });
@@ -108,27 +116,23 @@ export const uploadVideos = async (files, videoNames, weights) => {
 
 // ── SCORES ────────────────────────────────────────────────────────────────────
 
-/**
- * Get scores for a single video.
- * GET /scores/{video_id}
- * Returns all scores as 0.0–1.0 floats.
- */
 export const getVideoScores = async (videoId) => {
   return request(`/scores/${videoId}`);
 };
 
-/**
- * Get scores for multiple videos at once.
- * Fetches each video's scores in parallel.
- * @param {number[]} videoIds
- * @returns {Promise<Array>} array of score objects with video metadata
- */
 export const getMultipleVideoScores = async (videoIds) => {
   const results = await Promise.all(
     videoIds.map((id) => getVideoScores(id).catch(() => null))
   );
-  return results.filter(Boolean); // remove any failed fetches
+  return results.filter(Boolean);
 };
+
+export const getCandidatesByBatch = async (batchId) => {
+  const scores = await getVideoScores(batchId);
+  return [scores];
+};
+
+// ── METRIC WEIGHTS ────────────────────────────────────────────────────────────
 
 export const getMetricWeights = async () => {
   return request("/metrics/weights");
@@ -143,36 +147,30 @@ export const setMetricWeights = async (weights) => {
 
 // ── DERIVED DATA ──────────────────────────────────────────────────────────────
 
-/**
- * Get all reports and group them by upload batch.
- * Since the backend has no batch_id, we group by upload minute —
- * videos uploaded within the same minute = same batch.
- *
- * Returns array of batches:
- * [{
- *   batchKey: "2026-06-12T10:30",
- *   date: "2026/06/12",
- *   time: "10:30",
- *   videoIds: [1, 2, 3, 4],
- *   videoNames: ["Ahmed", "Sara", "Omar", "Lina"],
- *   count: 4,
- *   avgScore: 72,
- *   status: "DONE"
- * }]
- */
 export const getBatches = async () => {
   const { reports } = await getReports();
   if (!reports || reports.length === 0) return [];
 
-  // Group by upload minute
+  // Persistent map of videoId → role name
+  const batchRoleMap = JSON.parse(localStorage.getItem("batchRoleMap") || "{}");
+
   const groups = {};
+
   reports.forEach((r) => {
-    const date= new Date(r.uploaddate);
-    // const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
-    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
+    const date     = new Date(r.uploaddate);
+    const roleName = batchRoleMap[String(r.videoid)] || "";
+
+    // If video has a role name → group by "role_<roleName>_<date>"
+    // so different batches with different role names never merge.
+    // If no role name → group by exact minute as fallback.
+    const key = roleName
+      ? `role_${roleName}_${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+      : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+
     if (!groups[key]) {
       groups[key] = {
         batchKey:   key,
+        batchRole:  roleName,
         date:       date.toLocaleDateString("en-CA").replace(/-/g, "/"),
         time:       date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         videoIds:   [],
@@ -182,15 +180,23 @@ export const getBatches = async () => {
       };
     }
 
+    // If group doesn't have a role yet but this video does, assign it
+    if (!groups[key].batchRole && roleName) {
+      groups[key].batchRole = roleName;
+    }
+
+    // Clean candidate name — strip UUID and extension
+    const cleanName = r.videoname
+      .replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*$/i, "")
+      .replace(/_video$/, "")
+      .trim();
+
     groups[key].videoIds.push(r.videoid);
-    // groups[key].videoNames.push(r.videoname);
-    const cleanName = r.videoname.replace(/_[0-9a-f-]{36}\.[^.]+$/, "");
     groups[key].videoNames.push(cleanName);
     groups[key].scores.push(r.total_score || 0);
     groups[key].statuses.push(r.status);
   });
 
-  // Convert to array and calculate batch-level stats
   return Object.values(groups).map((batch) => {
     const avgScore  = Math.round(
       (batch.scores.reduce((a, b) => a + b, 0) / batch.scores.length) * 100
@@ -201,6 +207,7 @@ export const getBatches = async () => {
 
     return {
       batchKey:   batch.batchKey,
+      batchRole:  batch.batchRole,
       date:       batch.date,
       time:       batch.time,
       videoIds:   batch.videoIds,
@@ -209,8 +216,24 @@ export const getBatches = async () => {
       avgScore,
       topScore:   `${topScore}%`,
       status:     anyFailed ? "FAILED" : allDone ? "DONE" : "PENDING",
-      // pass IDs as comma-separated string for URL
       idsParam:   batch.videoIds.join(","),
     };
-  }).sort((a, b) => new Date(b.date) - new Date(a.date)); // newest first
+  }).sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+export const getDashboardStats = async () => {
+  const { reports } = await getReports();
+  if (!reports || reports.length === 0) {
+    return { totalCandidates: 0, passedThreshold: 0, avgAiMatchScore: 0, timeSavedHrs: 0 };
+  }
+  const totalCandidates = reports.length;
+  const avgAiMatchScore = Math.round(
+    (reports.reduce((sum, r) => sum + (r.total_score || 0), 0) / reports.length) * 100
+  );
+  return {
+    totalCandidates,
+    passedThreshold: 0,
+    avgAiMatchScore,
+    timeSavedHrs: Math.round(totalCandidates * 0.5),
+  };
 };

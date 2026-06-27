@@ -11,6 +11,9 @@ import RecruiterReport from "./pages/RecruiterReport/RecruiterReport";
 import ProcessVideoPage from "./pages/ProcessVideoPage";
 import SignInPage from "./pages/SignInPage";
 import { SignUp } from "./pages/SignUp/SignUp";
+import ForgotPassword   from "./pages/ForgotPassword/ForgotPassword";
+import ResetPassword    from "./pages/ForgotPassword/ResetPassword";
+
 
 const ProtectedRoute = ({ children }) => {
   const { isAuth, isLoading } = useAuth();
@@ -33,6 +36,9 @@ const AppRoutes = () => (
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/signup" element={<SignUp />} />
     <Route path="/how-it-works" element={<HowItWorksPage />} />
+    <Route path="/forgot-password" element={<ForgotPassword/>} />
+    <Route path="/reset-password"  element={<ResetPassword/>}  />
+
 
     // Protected routes
     <Route 
