@@ -52,13 +52,13 @@ const PublicNavbar = ({ activePage = "" }) => {
     <header className="w-full px-6 py-4 flex items-center justify-between relative z-50">
 
       {/* Logo */}
-      <Link
+      <span
         to="/"
         aria-label="Interview me home"
         className="font-['Pacifico'] text-[#009986] text-2xl md:text-3xl whitespace-nowrap"
       >
         Interview me
-      </Link>
+      </span>
 
       {/* Desktop Nav */}
       <nav className="hidden md:flex items-center gap-8" aria-label="Primary navigation">
