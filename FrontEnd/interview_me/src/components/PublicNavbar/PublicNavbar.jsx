@@ -55,7 +55,7 @@ const PublicNavbar = ({ activePage = "" }) => {
       <span
         to="/"
         aria-label="Interview me home"
-        className="font-['Pacifico'] text-[#009986] text-2xl md:text-3xl whitespace-nowrap"
+        className="logo font-['Pacifico'] text-[#009986] text-2xl md:text-3xl whitespace-nowrap"
       >
         Interview me
       </span>

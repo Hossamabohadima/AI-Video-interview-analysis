@@ -1,1 +1,16 @@
 @import "tailwindcss";
+.pacifico-regular {
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  font-style: normal;
+  color: #009986;
+}
+
+@keyframes color-rotate {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+.logo:hover {
+  animation: color-rotate 1s infinite alternate;
+}

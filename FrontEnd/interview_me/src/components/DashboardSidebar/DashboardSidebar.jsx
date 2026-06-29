@@ -31,13 +31,13 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
       >
         {/* Logo */}
         <div className="h-[73px] border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
-          <Link
+          <span
             to="/"
-            className="font-['Pacifico'] text-[#009986] text-3xl whitespace-nowrap"
+            className="logo font-['Pacifico'] text-[#009986] text-3xl whitespace-nowrap"
             aria-label="Interview me home"
           >
             Interview me
-          </Link>
+          </span>
 
           {/* Close button — mobile only */}
           <button

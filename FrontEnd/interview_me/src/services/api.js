@@ -39,7 +39,7 @@ const requestFormData = async (endpoint, formData) => {
   return response.json();
 };
 
-// ── AUTH ──────────────────────────────────────────────────────────────────────
+// Authentication
 
 export const signUp = async (userData) => {
   return request("/users/auth/signup", {
@@ -79,15 +79,12 @@ export const resetPassword = async (token, newPassword) => {
   });
 };
 
-// ── REPORTS ───────────────────────────────────────────────────────────────────
-
+// Reports 
 export const getReports = async () => {
   return request("/users/reports");
 };
 
-
-// ── SCORES ────────────────────────────────────────────────────────────────────
-
+// Scores 
 export const getVideoScores = async (videoId) => {
   const data = await request(`/scores/${videoId}`);
   if (data && data.score) {
@@ -103,8 +100,7 @@ export const getMultipleVideoScores = async (videoIds) => {
   return results.filter(Boolean);
 };
 
-// DERIVED DATA
-
+// derived data
 export const getBatches = async () => {
   const { reports } = await getReports();
   if (!reports || reports.length === 0) return [];
@@ -116,14 +112,11 @@ export const getBatches = async () => {
 
   reports.forEach((r) => {
     const date     = new Date(r.uploaddate);
-    const roleName = batchRoleMap[String(r.videoid)] || "";
+    const roleName = batchRoleMap[String(r.videoid)];
 
     // If video has a role name → group by "role_<roleName>_<date>"
     // so different batches with different role names never merge.
-    // If no role name → group by exact minute as fallback.
-    const key = roleName
-      ? `role_${roleName}_${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-      : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+    const key = `role_${roleName}_${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
     if (!groups[key]) {
       groups[key] = {
@@ -136,11 +129,6 @@ export const getBatches = async () => {
         scores:     [],
         statuses:   [],
       };
-    }
-
-    // If group doesn't have a role yet but this video does, assign it
-    if (!groups[key].batchRole && roleName) {
-      groups[key].batchRole = roleName;
     }
 
     // Clean candidate name — strip UUID and extension
