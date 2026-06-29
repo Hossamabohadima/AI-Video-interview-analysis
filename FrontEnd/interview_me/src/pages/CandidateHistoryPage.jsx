@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Spinner from "../components/UI/Spinner";
 
-
 function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
@@ -22,6 +21,10 @@ function formatDuration(seconds) {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
+function toPercent(value) {
+  return Math.round((value || 0) * 100);
+}
+
 function ProgressRow({ label, value }) {
   return (
     <div className="flex items-center gap-2">
@@ -37,7 +40,41 @@ function ProgressRow({ label, value }) {
   );
 }
 
-function SessionCard({ session }) {
+function ScoreDiffRow({ label, leftValue, rightValue }) {
+  const diff = rightValue - leftValue;
+  const diffColor =
+    diff > 0
+      ? "text-[#16A34A]"
+      : diff < 0
+        ? "text-[#DC2626]"
+        : "text-[#6B7280]";
+
+  return (
+    <div className="grid grid-cols-[120px_1fr_1fr_90px] items-center gap-3 py-2">
+      <div className="text-[12px] font-medium text-[#374151]">{label}</div>
+
+      <div className="rounded-lg bg-[#F9FAFB] px-3 py-2 text-[12px] text-[#111827]">
+        {leftValue}%
+      </div>
+
+      <div className="rounded-lg bg-[#F9FAFB] px-3 py-2 text-[12px] text-[#111827]">
+        {rightValue}%
+      </div>
+
+      <div className={`text-[12px] font-bold ${diffColor}`}>
+        {diff > 0 ? "+" : ""}
+        {diff} pts
+      </div>
+    </div>
+  );
+}
+
+function SessionCard({
+  session,
+  isSelected,
+  onToggleSelect,
+  disableSelection,
+}) {
   const faded = session.first;
 
   return (
@@ -94,7 +131,6 @@ function SessionCard({ session }) {
         <div className="flex flex-wrap gap-3 text-[10px] text-[#A1A1AA]">
           <span>📅 {session.date}</span>
           <span>⏱ {session.duration} duration</span>
-          {/* <span>🎯 {session.role}</span> */}
         </div>
       </div>
 
@@ -115,24 +151,28 @@ function SessionCard({ session }) {
         <div className="text-[9px] text-[#A1A1AA]">Overall</div>
       </div>
 
-      <div className="flex min-w-[90px] flex-col items-end gap-2">
+      <div className="flex min-w-[120px] flex-col items-end gap-2">
+        <button
+          type="button"
+          onClick={() => onToggleSelect(session.id)}
+          disabled={disableSelection && !isSelected}
+          className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${
+            isSelected
+              ? "border-[#0FA99D] bg-[#0FA99D] text-white"
+              : disableSelection
+                ? "cursor-not-allowed border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF]"
+                : "border-[#0FA99D] bg-white text-[#0FA99D] hover:bg-[#F0FDFA]"
+          }`}
+        >
+          {isSelected ? "Selected" : "Select"}
+        </button>
+
         <Link
           to={`/candidate-report/${session.id}`}
-          state={{ session }}
           className="rounded-full border border-[#0FA99D] bg-white px-3 py-1.5 text-[10px] font-bold text-[#0FA99D] hover:bg-[#F0FDFA]"
         >
           View Report
         </Link>
-
-        {/* {session.first ? (
-          <span className="text-[9px] font-bold text-[#9CA3AF]">
-            Starting point
-          </span>
-        ) : (
-          <span className="text-[9px] font-bold text-[#0FA99D]">
-            {session.delta}
-          </span>
-        )} */}
       </div>
     </div>
   );
@@ -165,10 +205,16 @@ function CandidateHistoryPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [selectedReports, setSelectedReports] = useState([]);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState("");
+  const [compareResult, setCompareResult] = useState(null);
+
   const navigate = useNavigate();
 
   const role = localStorage.getItem("role");
-  const name = localStorage.getItem("name");
+  const name = localStorage.getItem("name") || "User";
   const profileChar =
     name.trim().split(" ").length >= 2
       ? name
@@ -183,6 +229,7 @@ function CandidateHistoryPage() {
 
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
+
   const handleLogout = () => {
     localStorage.clear();
     navigate("/signin");
@@ -222,8 +269,6 @@ function CandidateHistoryPage() {
 
         const data = await response.json();
 
-        console.log("Fetched reports:", data);
-
         if (!response.ok) {
           throw new Error(
             typeof data?.detail === "string"
@@ -262,12 +307,12 @@ function CandidateHistoryPage() {
             date: formatDate(report.uploaddate),
             rawDate: report.uploaddate,
             duration: formatDuration(report.duration),
-            role: report.videoname,
-            overall: report.total_score,
+            role: report.videoname || "Interview Video",
+            overall: report.total_score || 0,
             latest: report.videoid === latestVideoId,
             best: report.total_score === bestScore,
             first: report.videoid === firstVideoId,
-            status: report.status,
+            status: report.status || "UNKNOWN",
             delta:
               deltaValue == null
                 ? ""
@@ -275,27 +320,27 @@ function CandidateHistoryPage() {
             metrics: [
               {
                 label: "Grammar",
-                value: Math.round(report.grammar_score * 100) ?? 0,
+                value: toPercent(report.grammar_score),
               },
               {
                 label: "Fillers",
-                value: Math.round(report.fillers_score * 100) ?? 0,
+                value: toPercent(report.fillers_score),
               },
               {
                 label: "Pause Rate",
-                value: Math.round(report.pause_rate_score * 100) ?? 0,
+                value: toPercent(report.pause_rate_score),
               },
               {
                 label: "Energy",
-                value: Math.round(report.energy_score * 100) ?? 0,
+                value: toPercent(report.energy_score),
               },
               {
                 label: "Eye Contact",
-                value: Math.round(report.eye_contact_score * 100) ?? 0,
+                value: toPercent(report.eye_contact_score),
               },
               {
                 label: "Emotion",
-                value: Math.round(report.emotion_score * 100) ?? 0,
+                value: toPercent(report.emotion_score),
               },
             ],
           };
@@ -313,6 +358,69 @@ function CandidateHistoryPage() {
     fetchReports();
   }, []);
 
+  const toggleSelectReport = (videoId) => {
+    setCompareError("");
+
+    setSelectedReports((prev) => {
+      if (prev.includes(videoId)) {
+        return prev.filter((id) => id !== videoId);
+      }
+
+      if (prev.length >= 2) {
+        return prev;
+      }
+
+      return [...prev, videoId];
+    });
+  };
+
+  const handleCompareReports = async () => {
+    if (selectedReports.length !== 2) {
+      setCompareError("Please select exactly 2 reports to compare.");
+      return;
+    }
+
+    try {
+      setCompareLoading(true);
+      setCompareError("");
+      setCompareResult(null);
+
+      const token = localStorage.getItem("access_token");
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/users/reports/compare",
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            video_ids: selectedReports,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : "Failed to compare reports",
+        );
+      }
+
+      setCompareResult(data);
+    } catch (err) {
+      console.error("Compare reports error:", err);
+      setCompareError(err.message || "Something went wrong while comparing.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
   const filteredAndSortedSessions = useMemo(() => {
     let result = [...sessions];
 
@@ -323,8 +431,8 @@ function CandidateHistoryPage() {
     } else if (filterBy === "first") {
       result = result.filter((session) => session.first);
     } else if (filterBy.startsWith("role:")) {
-      const role = filterBy.replace("role:", "");
-      result = result.filter((session) => session.role === role);
+      const roleValue = filterBy.replace("role:", "");
+      result = result.filter((session) => session.role === roleValue);
     }
 
     const query = searchTerm.trim().toLowerCase();
@@ -365,71 +473,21 @@ function CandidateHistoryPage() {
 
   const averageOverall =
     sessions.length > 0
-      ? Math.round(
-          sessions.reduce((sum, session) => sum + session.overall, 0) /
-            sessions.length,
-        )
+      ? sessions.reduce((sum, session) => sum + session.overall, 0) /
+        sessions.length
       : 0;
-  const metricImprovements =
-    sessions.length >= 2
-      ? (() => {
-          const newest = [...sessions].sort(
-            (a, b) => new Date(b.rawDate) - new Date(a.rawDate),
-          )[0];
 
-          const oldest = [...sessions].sort(
-            (a, b) => new Date(a.rawDate) - new Date(b.rawDate),
-          )[0];
-
-          const oldestMetricsMap = new Map(
-            oldest.metrics.map((metric) => [metric.label, metric.value]),
-          );
-
-          const diffs = newest.metrics
-            .filter((metric) => oldestMetricsMap.has(metric.label))
-            .map((metric) => {
-              const diff = metric.value - oldestMetricsMap.get(metric.label);
-
-              console.log(
-                `${metric.label}: ${metric.value} - ${oldestMetricsMap.get(metric.label)} = ${diff}`,
-              );
-
-              return {
-                label: metric.label,
-                diff,
-              };
-            });
-
-          console.log("All diffs:", diffs);
-
-          const best = diffs.reduce((best, current) =>
-            current.diff > best.diff ? current : best,
-          );
-
-          console.log("Most improved metric:", best);
-
-          return best;
-        })()
-      : null;
+  const comparisonScores = compareResult?.comparison?.scores || [];
+  const leftScore = comparisonScores[0];
+  const rightScore = comparisonScores[1];
 
   return (
     <div className="min-h-screen w-full bg-[#E8E6E2]">
-      {/* Header */}
       <header className="flex h-[72px] items-center justify-between border-b border-[#D8D8D8] bg-white px-6">
         <div className="flex items-center gap-10">
           <div className="text-[34px] font-normal text-[#0FA99D] [font-family:'Pacifico',Helvetica]">
             Interview me
           </div>
-
-          {/* <div className="relative w-[360px]">
-            <input
-              className="h-[36px] w-full rounded-full bg-[#EFEFEF] pl-10 pr-4 text-[11px] text-gray-700 outline-none placeholder:text-[#9CA3AF]"
-              placeholder="Search candidates, reports ..etc"
-            />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[#9CA3AF]">
-              🔍
-            </span>
-          </div> */}
         </div>
 
         <div className="flex items-center gap-4">
@@ -451,7 +509,7 @@ function CandidateHistoryPage() {
             </button>
 
             {profileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-[170px] rounded-[14px] border border-[#E5E7EB] bg-white py-2 shadow-lg z-50">
+              <div className="absolute right-0 z-50 mt-2 w-[170px] rounded-[14px] border border-[#E5E7EB] bg-white py-2 shadow-lg">
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -465,35 +523,9 @@ function CandidateHistoryPage() {
         </div>
       </header>
 
-      {/* Body */}
       <div className="flex">
-        {/* Sidebar */}
         <aside className="min-h-[calc(100vh-72px)] w-[240px] bg-white">
           <nav className="mt-8 flex flex-col gap-2 px-3">
-            {/* <Link
-              to="/"
-              className="flex items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
-            >
-              <span className="inline-flex h-6 w-6 items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#0FA99D"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 shrink-0"
-                >
-                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                  <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                </svg>
-              </span>
-              <span>Dashboard</span>
-            </Link> */}
-
             <Link
               to="/process-video"
               className="flex items-center gap-2 rounded-full px-4 py-3 text-[18px] font-medium text-[#0FA99D]"
@@ -555,9 +587,7 @@ function CandidateHistoryPage() {
               <InfoCard
                 title="Best score"
                 value={
-                  bestSession
-                    ? `${Math.round(bestSession.overall * 100)}%`
-                    : "0%"
+                  bestSession ? `${toPercent(bestSession.overall)}%` : "0%"
                 }
                 subtitle={
                   bestSession
@@ -568,19 +598,9 @@ function CandidateHistoryPage() {
               />
               <InfoCard
                 title="Avg. overall score"
-                value={`${Math.round(averageOverall * 100)}%`}
+                value={`${toPercent(averageOverall)}%`}
                 subtitle="Across all sessions"
               />
-              {/* <InfoCard
-                title="Most improved"
-                value={metricImprovements ? metricImprovements.label : "-"}
-                subtitle={
-                  metricImprovements
-                    ? `${metricImprovements.diff >= 0 ? "+" : ""}${metricImprovements.diff} pts improvement`
-                    : "Need at least 2 sessions"
-                }
-                accent
-              /> */}
             </div>
 
             <section className="mt-6">
@@ -620,14 +640,163 @@ function CandidateHistoryPage() {
                     <option value="latest">Latest</option>
                     <option value="best">Best score</option>
                     <option value="first">First session</option>
-                    {uniqueRoles.map((role) => (
-                      <option key={role} value={`role:${role}`}>
-                        {role}
+                    {uniqueRoles.map((roleOption) => (
+                      <option key={roleOption} value={`role:${roleOption}`}>
+                        {roleOption}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
+
+              <div className="mt-4 rounded-[16px] border border-[#D9EDEA] bg-white px-4 py-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[14px] font-semibold text-[#1F2937]">
+                      Compare Reports
+                    </div>
+                    <div className="text-[11px] text-[#9CA3AF]">
+                      Select exactly 2 reports to compare performance across
+                      attempts
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="text-[11px] text-[#6B7280]">
+                      Selected: {selectedReports.length}/2
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedReports([]);
+                        setCompareResult(null);
+                        setCompareError("");
+                      }}
+                      className="rounded-full border border-[#E5E7EB] bg-white px-3 py-2 text-[10px] font-semibold text-[#6B7280]"
+                    >
+                      Clear
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCompareReports}
+                      disabled={compareLoading || selectedReports.length !== 2}
+                      className={`rounded-full px-4 py-2 text-[10px] font-bold ${
+                        compareLoading || selectedReports.length !== 2
+                          ? "cursor-not-allowed bg-[#D1D5DB] text-white"
+                          : "bg-[#0FA99D] text-white hover:opacity-90"
+                      }`}
+                    >
+                      {compareLoading ? "Comparing..." : "Compare Now"}
+                    </button>
+                  </div>
+                </div>
+
+                {compareError && (
+                  <div className="mt-3 text-[11px] text-red-500">
+                    {compareError}
+                  </div>
+                )}
+              </div>
+
+              {compareResult?.comparison && leftScore && rightScore && (
+                <section className="mt-6 rounded-[20px] border border-[#D9EDEA] bg-white px-6 py-5 shadow-sm">
+                  <h2 className="text-[20px] font-semibold text-[#222]">
+                    Comparison Result
+                  </h2>
+
+                  <div className="mt-5 grid grid-cols-3 gap-3 border-b border-[#E5E7EB] pb-3">
+                    <div></div>
+                    <div className="rounded-xl bg-[#F0FDFA] px-4 py-3 text-center">
+                      <div className="text-[16px] font-bold text-[#0FA99D]">
+                        Video #{leftScore.videoID}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-[#F0FDFA] px-4 py-3 text-center">
+                      <div className="text-[16px] font-bold text-[#0FA99D]">
+                        Video #{rightScore.videoID}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <ScoreDiffRow
+                      label="Overall"
+                      leftValue={toPercent(leftScore.total_score)}
+                      rightValue={toPercent(rightScore.total_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Grammar"
+                      leftValue={toPercent(leftScore.grammar_score)}
+                      rightValue={toPercent(rightScore.grammar_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Fillers"
+                      leftValue={toPercent(leftScore.fillers_score)}
+                      rightValue={toPercent(rightScore.fillers_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Pause Rate"
+                      leftValue={toPercent(leftScore.pause_rate_score)}
+                      rightValue={toPercent(rightScore.pause_rate_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Energy"
+                      leftValue={toPercent(leftScore.energy_score)}
+                      rightValue={toPercent(rightScore.energy_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Eye Contact"
+                      leftValue={toPercent(leftScore.eye_contact_score)}
+                      rightValue={toPercent(rightScore.eye_contact_score)}
+                    />
+                    <ScoreDiffRow
+                      label="Emotion"
+                      leftValue={toPercent(leftScore.emotion_score)}
+                      rightValue={toPercent(rightScore.emotion_score)}
+                    />
+                  </div>
+                  <div className="mt-6 space-y-6">
+                    {compareResult.report
+                      ?.split("\n\n")
+                      .filter(Boolean)
+                      .map((section, index) => {
+                        const lines = section.split("\n");
+                        const heading = lines[0]?.trim()?.replace(/:$/, "");
+                        const content = lines.slice(1).join(" ").trim();
+
+                        const isMainHeading = [
+                          "Comparison Summary",
+                          "Detailed Breakdown",
+                          "The Winner",
+                          "Next Steps",
+                        ].includes(heading);
+
+                        return (
+                          <div
+                            key={index}
+                            className="rounded-[18px] border border-[#D9EDEA] bg-[#FAFFFE] px-6 py-5 shadow-sm"
+                          >
+                            <h3
+                              className={`mb-4 border-l-4 pl-4 leading-tight ${
+                                isMainHeading
+                                  ? "border-[#0FA99D] text-[28px] font-bold text-[#0FA99D]"
+                                  : "border-[#D1D5DB] text-[20px] font-semibold text-[#374151]"
+                              }`}
+                            >
+                              {heading}
+                            </h3>
+
+                            <p className="text-[17px] leading-8 text-[#4B5563]">
+                              {content}
+                            </p>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </section>
+              )}
 
               <div className="mt-4 flex flex-col gap-3">
                 {loading ? (
@@ -642,8 +811,14 @@ function CandidateHistoryPage() {
                 ) : filteredAndSortedSessions.length > 0 ? (
                   filteredAndSortedSessions.map((session) => (
                     <SessionCard
-                      key={session.sessionNumber}
+                      key={session.id}
                       session={session}
+                      isSelected={selectedReports.includes(session.id)}
+                      onToggleSelect={toggleSelectReport}
+                      disableSelection={
+                        selectedReports.length >= 2 &&
+                        !selectedReports.includes(session.id)
+                      }
                     />
                   ))
                 ) : (
