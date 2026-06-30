@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Spinner from "../components/UI/Spinner";
+import JobIcon from "../assets/job.svg";
+import WeightsIcon from "../assets/weights.svg";
 
 function SidebarItem({ active = false, icon, label, to = "#" }) {
   return (
@@ -74,7 +76,9 @@ function JobDetailsCard({ roleName, setRoleName }) {
   return (
     <div className="rounded-[18px] bg-white px-6 py-5 shadow-sm">
       <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#A1A1AA]">🎁</div>
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#A1A1AA]">
+            <img src={JobIcon} alt="job" className="h-4 w-4" />
+        </div>
         <h3 className="text-[18px] font-bold text-[#7C7C7C]">Job Details</h3>
       </div>
       <label className="mb-2 block text-[14px] text-[#7C7C7C]">Target Role Name</label>
@@ -113,7 +117,9 @@ function AnalysisWeightsCard({ weights, setWeights, threshold, setThreshold, isR
   return (
     <div className="rounded-[18px] bg-white px-6 py-5 shadow-sm">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#A1A1AA]">🎚</div>
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#A1A1AA]">
+          <img src={WeightsIcon} alt="weights" className="h-4 w-4" />  
+        </div>
         <h3 className="text-[18px] font-bold text-[#7C7C7C]">Analysis Weights</h3>
       </div>
       <div className="space-y-5">

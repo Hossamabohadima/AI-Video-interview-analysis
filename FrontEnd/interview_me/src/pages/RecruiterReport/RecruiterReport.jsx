@@ -11,7 +11,7 @@ import Spinner from "../../components/UI/Spinner";
 import useMobileMenu     from "../../hooks/useMobileMenu";
 import usePagination     from "../../hooks/usePagination";
 import { useAuth }       from "../../context/AuthContext";
-import { getMultipleVideoScores, getReports, updateThreshold } from "../../services/api";
+import { getMultipleVideoScores, getReports} from "../../services/api";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +72,6 @@ export const RecruiterReport = () => {
   const [error,           setError]            = useState(null);
   const [threshold,       setThreshold]        = useState(DEFAULT_THRESHOLD);
   const [thresholdInput,  setThresholdInput]   = useState(String(DEFAULT_THRESHOLD));
-  const [savingThreshold, setSavingThreshold]  = useState(false);
   const [thresholdSaved,  setThresholdSaved]   = useState(false);
 
   useEffect(() => {
@@ -129,20 +128,12 @@ export const RecruiterReport = () => {
   const { paginated, currentPage, totalPages, hasNext, hasPrev, next, prev, goTo } =
     usePagination(candidates, 6);
 
-  const applyThreshold = async () => {
+  const applyThreshold = () => {
     const val = parseInt(thresholdInput, 10);
     if (isNaN(val) || val < 0 || val > 100) { setThresholdInput(String(threshold)); return; }
     setThreshold(val);
-    setSavingThreshold(true);
-    try {
-      await updateThreshold(val);
-      setThresholdSaved(true);
-      setTimeout(() => setThresholdSaved(false), 3000);
-    } catch (err) {
-      setError(err.message || "Failed to save threshold");
-    } finally {
-      setSavingThreshold(false);
-    }
+    setThresholdSaved(true);
+    setTimeout(() => setThresholdSaved(false), 2000);
   };
 
   const summaryCards = [
@@ -226,9 +217,9 @@ export const RecruiterReport = () => {
                     />
                     <span className="text-sm font-bold text-gray-400">%</span>
                   </div>
-                  <button type="button" onClick={applyThreshold} disabled={savingThreshold}
-                    className="h-10 px-5 bg-[#009986] text-white text-sm font-bold rounded-xl hover:bg-[#007a6e] transition-colors disabled:opacity-60">
-                    {savingThreshold ? "Saving..." : "Apply"}
+                  <button type="button" onClick={applyThreshold}
+                    className="h-10 px-5 bg-[#009986] text-white text-sm font-bold rounded-xl hover:bg-[#007a6e] transition-colors">
+                    Apply
                   </button>
                   {thresholdSaved && <span className="text-xs text-[#009986] font-semibold">✓ Saved</span>}
                   <span className="text-xs text-gray-400">Active: <span className="font-bold text-[#009986]">{threshold}%</span></span>
@@ -319,19 +310,23 @@ export const RecruiterReport = () => {
                   <aside className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex-1 xl:flex-none">
                     <h3 className="text-xs font-bold text-[#009986] text-center mb-1">Score Distribution</h3>
                     <p className="text-[10px] text-gray-400 text-center mb-3">{candidates.length} candidates</p>
-                    <div className="flex items-end justify-between gap-1 h-20">
-                      {distribution.map((bar) => {
-                        const heightPct = Math.round((bar.count / maxBucket) * 100);
-                        return (
-                          <div key={bar.range} className="flex flex-col items-center gap-1 flex-1" title={`${bar.range}: ${bar.count}`}>
-                            <span className="text-[9px] font-bold text-gray-400">{bar.count}</span>
-                            <div className="w-full rounded-t-sm bg-[#009986] transition-all duration-500"
-                              style={{ height: `${Math.max(heightPct, bar.count > 0 ? 8 : 0)}%`, minHeight: bar.count > 0 ? "6px" : "0" }} />
-                            <span className="text-[8px] text-gray-400 whitespace-nowrap">{bar.range}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                      <div className="flex items-end justify-between gap-1 h-28">
+                        {distribution.map((bar) => {
+                          const heightPx = Math.round((bar.count / candidates.length) * 80);
+                          return (
+                            <div key={bar.range} className="flex flex-col items-center gap-1 flex-1" title={`${bar.range}: ${bar.count}`}>
+                              <span className="text-[9px] font-bold text-gray-400">
+                                {bar.count > 0 ? `${Math.round((bar.count / candidates.length) * 100)}%` : "0"}
+                              </span>
+                              <div
+                                className="w-full rounded-t-sm bg-[#009986] transition-all duration-500"
+                                style={{ height: bar.count > 0 ? `${Math.max(heightPx, 8)}px` : "0px" }}
+                              />
+                              <span className="text-[8px] text-gray-400 whitespace-nowrap">{bar.range}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                   </aside>
 
                   {/* Pass / Fail */}

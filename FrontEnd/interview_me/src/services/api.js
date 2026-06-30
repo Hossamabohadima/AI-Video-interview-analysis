@@ -5,7 +5,6 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
 
 const getToken = () =>
   localStorage.getItem("access_token") || localStorage.getItem("token");
@@ -40,7 +39,7 @@ const requestFormData = async (endpoint, formData) => {
   return response.json();
 };
 
-// ── AUTH ──────────────────────────────────────────────────────────────────────
+// Authentication
 
 export const signUp = async (userData) => {
   return request("/users/auth/signup", {
@@ -80,45 +79,14 @@ export const resetPassword = async (token, newPassword) => {
   });
 };
 
-// ── REPORTS ───────────────────────────────────────────────────────────────────
-
+// Reports 
 export const getReports = async () => {
   return request("/users/reports");
 };
 
-export const compareReports = async (video1, video2) => {
-  return request(`/users/reports/compare?video1=${video1}&video2=${video2}`, {
-    method: "POST",
-  });
-};
-
-// ── THRESHOLD ─────────────────────────────────────────────────────────────────
-
-export const updateThreshold = async (scorePercent) => {
-  const score = scorePercent / 100;
-  return request(`/users/threshold?score=${score}`, { method: "PUT" });
-};
-
-// ── VIDEOS ────────────────────────────────────────────────────────────────────
-
-export const uploadVideos = async (files, videoNames, weights) => {
-  const formData = new FormData();
-  files.forEach((file)      => formData.append("files",        file));
-  videoNames.forEach((name) => formData.append("video_names",  name));
-  formData.append("fillers_weight",     weights.fillers_weight);
-  formData.append("pause_rate_weight",  weights.pause_rate_weight);
-  formData.append("emotion_weight",     weights.emotion_weight);
-  formData.append("energy_weight",      weights.energy_weight);
-  formData.append("eye_contact_weight", weights.eye_contact_weight);
-  formData.append("grammar_weight",     weights.grammar_weight);
-  return requestFormData("/users/videos/upload", formData);
-};
-
-// ── SCORES ────────────────────────────────────────────────────────────────────
-
+// Scores 
 export const getVideoScores = async (videoId) => {
   const data = await request(`/scores/${videoId}`);
-  console.log(`Scores for video ${videoId}:`, JSON.stringify(data));
   if (data && data.score) {
     return { ...data.score, video_id: videoId };
   }
@@ -132,26 +100,7 @@ export const getMultipleVideoScores = async (videoIds) => {
   return results.filter(Boolean);
 };
 
-export const getCandidatesByBatch = async (batchId) => {
-  const scores = await getVideoScores(batchId);
-  return [scores];
-};
-
-// ── METRIC WEIGHTS ────────────────────────────────────────────────────────────
-
-export const getMetricWeights = async () => {
-  return request("/metrics/weights");
-};
-
-export const setMetricWeights = async (weights) => {
-  return request("/metrics/weights", {
-    method: "PUT",
-    body: JSON.stringify(weights),
-  });
-};
-
-// ── DERIVED DATA ──────────────────────────────────────────────────────────────
-
+// derived data
 export const getBatches = async () => {
   const { reports } = await getReports();
   if (!reports || reports.length === 0) return [];
@@ -163,14 +112,11 @@ export const getBatches = async () => {
 
   reports.forEach((r) => {
     const date     = new Date(r.uploaddate);
-    const roleName = batchRoleMap[String(r.videoid)] || "";
+    const roleName = batchRoleMap[String(r.videoid)];
 
     // If video has a role name → group by "role_<roleName>_<date>"
     // so different batches with different role names never merge.
-    // If no role name → group by exact minute as fallback.
-    const key = roleName
-      ? `role_${roleName}_${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-      : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+    const key = `role_${roleName}_${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
     if (!groups[key]) {
       groups[key] = {
@@ -183,11 +129,6 @@ export const getBatches = async () => {
         scores:     [],
         statuses:   [],
       };
-    }
-
-    // If group doesn't have a role yet but this video does, assign it
-    if (!groups[key].batchRole && roleName) {
-      groups[key].batchRole = roleName;
     }
 
     // Clean candidate name — strip UUID and extension
@@ -224,21 +165,4 @@ export const getBatches = async () => {
       idsParam:   batch.videoIds.join(","),
     };
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
-};
-
-export const getDashboardStats = async () => {
-  const { reports } = await getReports();
-  if (!reports || reports.length === 0) {
-    return { totalCandidates: 0, passedThreshold: 0, avgAiMatchScore: 0, timeSavedHrs: 0 };
-  }
-  const totalCandidates = reports.length;
-  const avgAiMatchScore = Math.round(
-    (reports.reduce((sum, r) => sum + (r.total_score || 0), 0) / reports.length) * 100
-  );
-  return {
-    totalCandidates,
-    passedThreshold: 0,
-    avgAiMatchScore,
-    timeSavedHrs: Math.round(totalCandidates * 0.5),
-  };
 };

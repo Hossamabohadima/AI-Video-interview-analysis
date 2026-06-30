@@ -33,31 +33,11 @@ function HowItWorksPage() {
   }, []);
 
   const handleAnalyzeInterviewNavigation = () => {
-    const accessToken = localStorage.getItem("access_token");
-
-    if (!accessToken) {
-      navigate("/signup");
-      return;
-    }
-
-    navigate("/process-video");
+    navigate("/sign-in");
   };
 
   const handleViewReportNavigation = () => {
-    const accessToken = localStorage.getItem("access_token");
-    const role = localStorage.getItem("role");
-
-    if (!accessToken) {
-      navigate("/signup");
-      return;
-    }
-
-    if (role === "RECRUITER") {
-      navigate("/recruiter-history");
-      return;
-    }
-
-    navigate("/candidate-history");
+    navigate("/sign-in");
   };
 
   const navItems = [
