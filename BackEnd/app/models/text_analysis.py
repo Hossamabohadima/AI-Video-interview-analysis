@@ -28,27 +28,62 @@ class TextAnalysis(IAnalysisModel):
                 print(f"Warning: Failed to initialize grammar tool: {e}")
                 self.grammar_tool = None
 
-    def _extract_words_and_text(self, whisper_result):
+    def _extract_words_and_text(self,whisper_result):
         """
-        Extracts the full text and a list of word dictionaries from Whisper results.
-
+        Extracts the full text and a list of word dictionaries from Hugging Face Whisper results.
+    
         Args:
-            whisper_result (dict): The result dictionary from Whisper transcription.
-
+            whisper_result (dict): The result dictionary from HF pipeline transcription.
+    
         Returns:
-            tuple: (words_only, full_text) where words_only is a list of word dicts and full_text is the stripped text.
+            tuple: (words_only, full_text) where words_only is a list of chunks and full_text is the stripped text.
         """
-        # 1. Get the full string of text
-        full_text = whisper_result["text"].strip()
+        # Get the full string of text safely
+        full_text = whisper_result.get("text", "").strip()
         
-        # 2. Extract the list of word dictionaries
-        words_only = []
-        for seg in whisper_result["segments"]:
-            for w in seg["words"]:
-                words_only.append(w)         
+        # Extract the list of word/chunk dictionaries
+        words_only = whisper_result.get("chunks", [])
+             
         return words_only, full_text
 
 
+    def _grammar_mistakes(self,full_text):
+        """
+        Calculate grammar mistakes in the full text.
+    
+        Args:
+            full_text (str): The full text transcript.
+    
+        Returns:
+            tuple: (mistakes_list, grammar_score, num_errors, word_count)
+        """
+        if not full_text:
+            return [], 100.0, 0, 0
+        
+        if self.grammar_tool is None:
+            return [], 100.0, 0, len(full_text.split())
+        
+        matches = self.grammar_tool.check(full_text)
+        mistakes = []
+        
+        for match in matches:
+            # Include GRAMMAR, TYPOS, and MISC to capture spoken anomalies accurately
+            target_categories = {'GRAMMAR', 'TYPOS', 'MISC', 'CONFUSED_WORDS'}
+            if match.category in target_categories:
+                mistakes.append({
+                    "category": match.category,
+                    "error_message": match.message,
+                    "incorrect_text": match.context,
+                    "suggestions": match.replacements[:3]  # Top 3 suggestions
+                })
+                
+        num_errors = len(mistakes)
+        word_count = max(len(full_text.split()), 1)
+    
+        # Scoring out of 100 for evaluation consistency 
+        grammar_score = max(0.0, 100.0 - (num_errors / word_count * 100))
+        
+        return mistakes, grammar_score, num_errors, word_count
     def _pause_quality_score(self, words, min_threshold=0.25, ideal_min=0.4, ideal_max=0.8):
         """
         Calculate the percentage of pauses that fall within the ideal natural range (around 0.6s).
@@ -105,42 +140,6 @@ class TextAnalysis(IAnalysisModel):
         total_words = len(words)
         filler_count = sum(1 for w in words if w["word"].lower() in fillers)
         return total_words, filler_count
-
-
-    def _grammar_mistakes(self, full_text):
-        """
-        Calculate grammar mistakes in the full text.
-
-        Args:
-            full_text (str): The full text transcript.
-
-        Returns:
-            tuple: (mistakes_list, grammar_score, num_errors, word_count)
-        """
-        if not full_text:
-            return [], 100.0, 0, 0
-        
-        if self.grammar_tool is None:
-            return [], 100.0, 0, len(full_text.split())
-        
-        matches = self.grammar_tool.check(full_text)
-        mistakes = []
-        
-        for match in matches:
-            # Only include GRAMMAR category errors
-            if match.category == 'GRAMMAR':
-                mistakes.append({
-                    "category": match.category,
-                    "error_message": match.message,
-                    "incorrect_text": match.context,
-                    "suggestions": match.replacements[:3]  # Top 3 suggestions
-                })
-        num_errors = len(mistakes)
-        word_count = max(len(full_text.split()), 1)
-
-        grammar_score = max(0.0, 1.0 - (num_errors / word_count))
-        
-        return mistakes, grammar_score, num_errors, word_count
 
     def analyze(self, input_data: AnalysisInput) -> dict:
         """
