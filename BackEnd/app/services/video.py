@@ -218,19 +218,17 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
     emotions = facial_results.get("face_emotions", {}) or {}
-    happy = float(emotions.get("happy", 0.0))
-    neutral = float(emotions.get("neutral", 0.0))
-    surprise = float(emotions.get("surprise", 0.0))
-    angry = float(emotions.get("angry", 0.0))
-    disgust = float(emotions.get("disgust", 0.0))
-    fear = float(emotions.get("fear", 0.0))
-    sad = float(emotions.get("sad", 0.0))
+    happy = float(facial_results.get("happy", 0.0))
+    neutral = float(facial_results.get("neutral", 0.0))
+    surprise = float(facial_results.get("surprise", 0.0))
+    angry = float(facial_results.get("angry", 0.0))
+    disgust = float(facial_results.get("disgust", 0.0))
+    fear = float(facial_results.get("fear", 0.0))
+    sad = float(facial_results.get("sad", 0.0))
 
-    positive = happy + neutral + 0.5 * surprise
-    negative = angry + disgust + 0.8 * fear + 0.9 * sad
-    raw_emotion_score = positive / (positive + negative) * 100.0 if (positive + negative) > 0 else 0.0
-    emotion_pct = max(0.0, min(raw_emotion_score, 100.0))
-    emotion_score = emotion_pct / 100.0
+    positive = happy + neutral +  surprise+ min(.5*fear ,.2)
+    negative = angry + disgust + .5* fear + 0.9 * sad
+    emotion_score = positive / (positive + negative)  if (positive + negative) > 0 else 0.0
 
     eye_contact_raw = facial_results.get("eye_contact_score", 0.0) or 0.0
     eye_contact_score = min(max(float(eye_contact_raw), 0.0), 1.0)
@@ -310,10 +308,17 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
 
         # 3. Extract audio and transcribe
         audio_path = _extract_audio_from_video(video_path)
+        whisper_model = whisper.load_model("medium.en")
         
+        # 2. Transcribe using your raw error parameters
+        whisper_result = whisper_model.transcribe(
+            audio_path,
+            language="en",              # Limits the vocabulary to English
+            temperature=0.0,            # Disables guessing or creative correction 
+            suppress_tokens=[],         # Keeps filler sounds and raw spoken anomalies
+            word_timestamps=True        # Essential for getting individual word timings
+        )
         # Use base.en for reliability (smaller, faster, avoids checksum issues)
-        whisper_model = whisper.load_model("base.en")
-        whisper_result = whisper_model.transcribe(audio_path, word_timestamps=True)
 
         # 4. Run analysis models
         facial_model = FacialAnalysis(face_options=face_options)
