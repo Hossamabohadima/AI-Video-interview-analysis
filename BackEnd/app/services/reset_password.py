@@ -27,34 +27,34 @@ def _build_reset_link(token: str) -> str:
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     return f"{frontend_url}/reset-password?token={token}"
 
-
 def _send_reset_email(email: str, token: str) -> bool:
     """Send password reset email to user."""
     try:
         # Read email template
+            # 1. Resolve path and read file
         template_path = os.path.join(
             os.path.dirname(__file__), "..", "templates", "reset_password_email.html"
         )
-        
+
         html_template = ""
         if os.path.exists(template_path):
             with open(template_path, "r", encoding="utf-8") as f:
                 html_template = f.read()
         else:
-            # Fallback template if file doesn't exist
-            html_template = """
-            <h1>Password Reset - InterviewMe</h1>
-            <p>Click <a href="{reset_link}">here</a> to reset your password.</p>
-            <p>Or use this token: {token}</p>
-            <p>This link expires in 1 hour.</p>
-            """
-        
+            # Safe fallback if file isn't found
+            html_template = "<h1>Password Reset</h1><p>Link: {{ reset_link }}</p><p>Token: {{ reset_token }}</p>"
+
+        # 2. Build the link
         reset_link = _build_reset_link(token)
-        
-        # Replace placeholders
-        html_body = html_template.replace("{{ reset_link }}", reset_link)
-        html_body = html_body.replace("{{ reset_token }}", token)
-        
+        if r"{{ reset_link }}" not in html_template:
+              print(r"WARNING: '{{ reset_link }}' placeholder was not found in the HTML file!")
+        # 3. Replace placeholders EXACTLY as written in your HTML file
+        html_body = html_template.replace(r"{{ reset_link }}", reset_link)
+        html_body = html_body.replace(r"{{ reset_token }}", token)
+        if r"{{ reset_link }}" in html_body or r"{{ reset_token }}" in html_body:
+            print("ERROR: One or more placeholders were NOT replaced!")
+        else:
+            print("SUCCESS: All placeholders replaced successfully.")
         email_service = get_email_service()
         return email_service.send_email(
             to_email=email,
