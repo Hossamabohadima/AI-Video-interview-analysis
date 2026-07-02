@@ -1,4 +1,5 @@
 import asyncio
+import random
 from openai import AsyncOpenAI
 from ..services.report import video_report
 from ..models.IAnalysisModel import AnalysisInput
@@ -210,21 +211,21 @@ def scoring(facial_results: dict, audio_results: dict, text_results: dict, weigh
     total_words = text_results.get("total_words", 0) or 0
     filler_count = text_results.get("filler_count", 0) or 0
     filler_rate_pct = (filler_count / total_words) * 100 if total_words > 0 else 0.0
-    fillers_score = max(0.0, 1.0 - (filler_rate_pct / 100.0))
+    fillers_score = max(0.0, 1.0 - (filler_rate_pct / 100.0)-random.uniform(0.0, 0.1))  # Add a small random factor to avoid ties
 
     pause_rate_pct = text_results.get("pause_rate", 0.0) or 0.0
-    pause_rate_score = min(max(pause_rate_pct / 100.0, 0.0)+0.1, 1.0)
+    pause_rate_score = min(max(1-pause_rate_pct / 100.0, 0.0)+0.1, 1.0)
 
     grammar_score = min(max(float(text_results.get("grammar_score", 1.0) or 1.0), 0.0), 1.0)
 
     emotions = facial_results.get("face_emotions", {}) or {}
-    happy = float(facial_results.get("happy", 0.0))
-    neutral = float(facial_results.get("neutral", 0.0))
-    surprise = float(facial_results.get("surprise", 0.0))
-    angry = float(facial_results.get("angry", 0.0))
-    disgust = float(facial_results.get("disgust", 0.0))
-    fear = float(facial_results.get("fear", 0.0))
-    sad = float(facial_results.get("sad", 0.0))
+    happy = float(emotions.get("happy", 0.0))
+    neutral = float(emotions.get("neutral", 0.0))
+    surprise = float(emotions.get("surprise", 0.0))
+    angry = float(emotions.get("angry", 0.0))
+    disgust = float(emotions.get("disgust", 0.0))
+    fear = float(emotions.get("fear", 0.0))
+    sad = float(emotions.get("sad", 0.0))
 
     positive = happy + neutral +  surprise+ min(.5*fear ,.2)
     negative = angry + disgust + .5* fear + 0.9 * sad
