@@ -63,19 +63,23 @@ async def get_video_scores(video_id: int, user_id: int) -> dict:
         if not GROQ_API_KEY:
             report = "Video analysis completed. LLM report generation unavailable (API key not configured)."
         else:
-            groq_client = AsyncOpenAI(
-                api_key=GROQ_API_KEY,
-                base_url="https://api.groq.com/openai/v1"
-            )
-            
-            report = await video_report(groq_client, score, {
-                "fillers_words": analysis_data.get("fillers_Word") or {},
-                "rate_of_stop": _safe_float(analysis_data.get("rate_Of_Stop"), 0.0),
-                "emotion_analysis": analysis_data.get("emotion_analysis") or {},
-                "energy_statistics": analysis_data.get("energy_Statistics") or {},
-                "eye_contact": analysis_data.get("eye_Contact") or {},
-                "grammar_mistakes": analysis_data.get("grammar_Mistakes") or [],
-            })
+            try:
+                groq_client = AsyncOpenAI(
+                    api_key=GROQ_API_KEY,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                
+                report = await video_report(groq_client, score, {
+                    "fillers_words": analysis_data.get("fillers_Word") or {},
+                    "rate_of_stop": _safe_float(analysis_data.get("rate_Of_Stop"), 0.0),
+                    "emotion_analysis": analysis_data.get("emotion_analysis") or {},
+                    "energy_statistics": analysis_data.get("energy_Statistics") or {},
+                    "eye_contact": analysis_data.get("eye_Contact") or {},
+                    "grammar_mistakes": analysis_data.get("grammar_Mistakes") or [],
+                })
+            except Exception as e:
+                print(f"[WARNING] LLM report generation failed: {str(e)}")
+                report = "AI report generation is temporarily unavailable due to rate limits. Please try again later."
         
         return {"score": score, "report": report}
         

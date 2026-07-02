@@ -189,11 +189,15 @@ async def compare_reports(video_ids: list[int], user_id: int):
         if not GROQ_API_KEY:
             report = "Comparison completed. LLM report generation unavailable (API key not configured)."
         else:
-            Groq_client = AsyncOpenAI(
-                api_key=GROQ_API_KEY,
-                base_url="https://api.groq.com/openai/v1"
-            )
-            report = await compare_between_reports(Groq_client, result)
+            try:
+                Groq_client = AsyncOpenAI(
+                    api_key=GROQ_API_KEY,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                report = await compare_between_reports(Groq_client, result)
+            except Exception as e:
+                print(f"[WARNING] LLM report generation failed: {str(e)}")
+                report = "AI report generation is temporarily unavailable due to rate limits. Please try again later."
         
         return result, report
     except HTTPException:

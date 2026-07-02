@@ -374,10 +374,14 @@ def _process_video_sync(video_id: int, weights: MetricWeights | None = None, vid
         if not GROQ_API_KEY:
             report = "Video analysis completed successfully. LLM report generation unavailable (API key not configured)."
         else:
-            Groq_client = AsyncOpenAI(
-                api_key=GROQ_API_KEY,
-                base_url="https://api.groq.com/openai/v1"
-            )
+            try:
+                Groq_client = AsyncOpenAI(
+                    api_key=GROQ_API_KEY,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+            except Exception as e:
+                print(f"[WARNING] LLM report generation failed for video {video_id}: {str(e)}")
+                report = "AI report generation is temporarily unavailable due to rate limits. Please try again later."
             
  
         
